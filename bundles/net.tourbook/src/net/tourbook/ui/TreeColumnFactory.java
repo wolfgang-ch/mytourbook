@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -106,6 +106,7 @@ public abstract class TreeColumnFactory {
    public static final TreeColumnFactory MOTION_AVG_SPEED;
    public static final TreeColumnFactory MOTION_DISTANCE;
    public static final TreeColumnFactory MOTION_MAX_SPEED;
+   public static final TreeColumnFactory MOTION_NORMALIZED_PACE;
 
    public static final TreeColumnFactory TOUR_REFTOUR_TOUR;
 
@@ -213,10 +214,10 @@ public abstract class TreeColumnFactory {
             final String unitLabel = UI.SYMBOL_AVERAGE + UI.SPACE + UI.UNIT_LABEL_ALTITUDE + "/" + UI.UNIT_LABEL_DISTANCE; //$NON-NLS-1$
 
             colDef.setColumnCategory(Messages.ColumnFactory_Category_Altitude);
-            colDef.setColumnLabel(Messages.ColumnFactory_Altitude_AvgChange_Label);
+            colDef.setColumnLabel(Messages.ColumnFactory_Elevation_AvgChange_Label);
             colDef.setColumnHeaderText(unitLabel);
             colDef.setColumnUnit(unitLabel);
-            colDef.setColumnHeaderToolTipText(Messages.ColumnFactory_Altitude_AvgChange_Tooltip);
+            colDef.setColumnHeaderToolTipText(Messages.ColumnFactory_Elevation_AvgChange_Tooltip);
 
             colDef.setDefaultColumnWidth(pixelConverter.convertWidthInCharsToPixels(10));
 
@@ -621,6 +622,30 @@ public abstract class TreeColumnFactory {
                   ValueFormat.NUMBER_1_1,
                   ValueFormat.NUMBER_1_1,
                   columnManager);
+
+            return colDef;
+         }
+      };
+
+      MOTION_NORMALIZED_PACE = new TreeColumnFactory() {
+         @Override
+         public TreeColumnDefinition createColumn(final ColumnManager columnManager,
+                                                  final PixelConverter pixelConverter) {
+
+            final TreeColumnDefinition colDef = new TreeColumnDefinition(//
+                  columnManager,
+                  "MOTION_NORMALIZED_PACE", //$NON-NLS-1$
+                  SWT.TRAIL);
+
+            final String unitLabel = "n" + UI.UNIT_LABEL_PACE; //$NON-NLS-1$
+
+            colDef.setColumnCategory(Messages.ColumnFactory_Category_Motion);
+            colDef.setColumnLabel(Messages.ColumnFactory_Pace_Normalized_Label);
+            colDef.setColumnHeaderText(unitLabel);
+            colDef.setColumnUnit(unitLabel);
+            colDef.setColumnHeaderToolTipText(Messages.ColumnFactory_Pace_Normalized_Tooltip);
+
+            colDef.setDefaultColumnWidth(pixelConverter.convertWidthInCharsToPixels(5));
 
             return colDef;
          }
@@ -2118,6 +2143,7 @@ public abstract class TreeColumnFactory {
             final TreeColumnDefinition colDef = new TreeColumnDefinition(columnManager, "TOUR_TYPE", SWT.LEAD); //$NON-NLS-1$
 
             colDef.setColumnCategory(Messages.ColumnFactory_Category_Tour);
+            colDef.setColumnHeaderText(Messages.ColumnFactory_tour_type_header);
             colDef.setColumnLabel(Messages.ColumnFactory_tour_type_label);
             colDef.setColumnHeaderToolTipText(Messages.ColumnFactory_tour_type_tooltip);
 

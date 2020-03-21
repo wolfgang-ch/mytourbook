@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -61,7 +61,9 @@ public class MesgListener_Session extends AbstractMesgListener implements Sessio
 
       final Sport sport = mesg.getSport();
       if (sport != null) {
-         tourData.setDeviceModeName(sport.name());
+         final String sportName = sport.name().trim();
+         tourData.setDeviceModeName(sportName);
+         fitData.setSportname(sportName);
       }
 
       final Short avgHeartRate = mesg.getAvgHeartRate();
@@ -121,19 +123,24 @@ public class MesgListener_Session extends AbstractMesgListener implements Sessio
       if (mesg.getMaxPower() == null && mesg.getAvgPower() == null) {
          final ArrayList<Float> powerDataList = new ArrayList<>();
          for (final TimeData timeData : fitData.getAllTimeData()) {
-            powerDataList.add(timeData.power);
+            if (timeData.power != Float.MIN_VALUE) {
+               powerDataList.add(timeData.power);
+            }
 
-            if (tourData.getPower_DataSource() == null) {
+            if (tourData.getPower_DataSource() == null && timeData.powerDataSource != null) {
                tourData.setPower_DataSource(timeData.powerDataSource);
             }
          }
 
-         fitData.isComputeAveragePower = true;
+         if (powerDataList.size() > 0) {
 
-         maxPower = (int) powerDataList.stream().mapToDouble(Float::doubleValue).max().getAsDouble();
-         tourData.setPower_Max(maxPower);
+            fitData.isComputeAveragePower = true;
 
-         tourData.setIsStrideSensorPresent(true);
+            maxPower = (int) powerDataList.stream().mapToDouble(Float::doubleValue).max().getAsDouble();
+            tourData.setPower_Max(maxPower);
+
+            tourData.setIsStrideSensorPresent(true);
+         }
       }
 
       final Integer normalizedPower = mesg.getNormalizedPower();

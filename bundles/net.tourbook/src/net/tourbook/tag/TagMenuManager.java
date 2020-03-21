@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -59,7 +59,7 @@ public class TagMenuManager {
 
    private static final String            SETTINGS_SECTION_RECENT_TAGS = "TagManager.RecentTags";                              //$NON-NLS-1$
    private static final String            STATE_RECENT_TAGS            = "tagId";                                              //$NON-NLS-1$
-   private static final String            STATE_PREVIOUS_TAGS          = "";                                                   //$NON-NLS-1$
+   private static final String            STATE_PREVIOUS_TAGS          = UI.EMPTY_STRING;
 
    private static final IPreferenceStore  _prefStore                   = TourbookPlugin.getPrefStore();
    private static final IDialogSettings   _state                       = TourbookPlugin.getState(SETTINGS_SECTION_RECENT_TAGS);
@@ -262,6 +262,12 @@ public class TagMenuManager {
       _prefStore.addPropertyChangeListener(_prefChangeListener);
    }
 
+   public static void clearRecentTags() {
+
+      _allPreviousTags.clear();
+      _recentTags.clear();
+   }
+
    static void enableRecentTagActions(final boolean isAddTagEnabled, final Set<Long> existingTagIds) {
 
       if (_actionsRecentTags == null) {
@@ -333,6 +339,7 @@ public class TagMenuManager {
    }
 
    private static void restoreAutoOpen() {
+
       _isTaggingAutoOpen = _prefStore.getBoolean(ITourbookPreferences.APPEARANCE_IS_TAGGING_AUTO_OPEN);
       _isTaggingAnimation = _prefStore.getBoolean(ITourbookPreferences.APPEARANCE_IS_TAGGING_ANIMATION);
       _taggingAutoOpenDelay = _prefStore.getInt(ITourbookPreferences.APPEARANCE_TAGGING_AUTO_OPEN_DELAY);
@@ -410,10 +417,7 @@ public class TagMenuManager {
     */
    private static void setupRecentActions() {
 
-      _maxRecentActions = TourbookPlugin
-            .getDefault()
-            .getPreferenceStore()
-            .getInt(ITourbookPreferences.APPEARANCE_NUMBER_OF_RECENT_TAGS);
+      _maxRecentActions = _prefStore.getInt(ITourbookPreferences.APPEARANCE_NUMBER_OF_RECENT_TAGS);
 
       _actionsRecentTags = new ActionRecentTag[_maxRecentActions];
 
@@ -614,7 +618,7 @@ public class TagMenuManager {
 
             } else {
 
-               actionRecentTag.setupTagAction(//
+               actionRecentTag.setupTagAction(
                      tag,
                      (UI.MNEMONIC + (tagIndex + 1) + UI.SPACE2 + tag.getTagName()));
                new ActionContributionItem(actionRecentTag).fill(menu, -1);

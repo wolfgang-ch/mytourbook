@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -79,6 +79,7 @@ import net.tourbook.common.util.MtMath;
 import net.tourbook.common.util.StatusUtil;
 import net.tourbook.common.weather.IWeather;
 import net.tourbook.database.FIELD_VALIDATION;
+import net.tourbook.database.PersonManager;
 import net.tourbook.database.TourDatabase;
 import net.tourbook.importdata.TourbookDevice;
 import net.tourbook.math.Smooth;
@@ -95,6 +96,7 @@ import net.tourbook.tour.BreakTimeTool;
 import net.tourbook.tour.TourManager;
 import net.tourbook.tour.photo.TourPhotoLink;
 import net.tourbook.tour.photo.TourPhotoManager;
+import net.tourbook.trainingstress.Govss;
 import net.tourbook.ui.UI;
 import net.tourbook.ui.tourChart.ChartLabel;
 import net.tourbook.ui.tourChart.ChartLayer2ndAltiSerie;
@@ -143,13 +145,13 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
     *   places   degrees      DMS                  qualitative scale that           N/S or E/W      E/W at         E/W at       E/W at
     *                                              can be identified                at equator      23N/S          45N/S        67N/S
     *
-    *    0       1.0          1� 00' 0?       country or large region            111.32   km   102.47   km     78.71  km    43.496  km
-    *    1       0.1          0� 06' 0?       large city or district              11.132  km    10.247  km      7.871 km     4.3496 km
-    *    2       0.01         0� 00' 36?      town or village                      1.1132 km     1.0247 km    787.1   m    434.96   m
-    *    3       0.001        0� 00' 3.6?     neighborhood, street               111.32   m    102.47   m      78.71  m     43.496  m
-    *    4       0.0001       0� 00' 0.36?    individual street, land parcel      11.132  m     10.247  m       7.871 m      4.3496 m
-    *    5       0.00001      0� 00' 0.036?   individual trees                     1.1132 m      1.0247 m     787.1   mm   434.96   mm
-    *    6       0.000001     0� 00' 0.0036?  individual humans                  111.32   mm   102.47   mm     78.71  mm    43.496  mm
+    *    0       1.0          1° 00′ 0″       country or large region            111.32   km   102.47   km     78.71  km    43.496  km
+    *    1       0.1          0° 06′ 0″       large city or district              11.132  km    10.247  km      7.871 km     4.3496 km
+    *    2       0.01         0° 00′ 36″      town or village                      1.1132 km     1.0247 km    787.1   m    434.96   m
+    *    3       0.001        0° 00′ 3.6″     neighborhood, street               111.32   m    102.47   m      78.71  m     43.496  m
+    *    4       0.0001       0° 00′ 0.36″    individual street, land parcel      11.132  m     10.247  m       7.871 m      4.3496 m
+    *    5       0.00001      0° 00′ 0.036″   individual trees                     1.1132 m      1.0247 m     787.1   mm   434.96   mm
+    *    6       0.000001     0° 00′ 0.0036″  individual humans                  111.32   mm   102.47   mm     78.71  mm    43.496  mm
     *
     * https://en.wikipedia.org/wiki/Decimal_degrees
     *
@@ -359,7 +361,6 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    /**
     * Average altitude change (m/km)
     */
-   @XmlElement
    private int                   avgAltitudeChange;
 
    // ############################################# PULSE/WEIGHT/POWER #############################################
@@ -429,11 +430,11 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    /**
     * Time spent (in seconds) in the "Slow" cadence zone (for example: Hiking).
     */
-   private int                   cadenceZone_SlowTime                        = -1;                     // db-version 40
+   private int                   cadenceZone_SlowTime                        = 0;                     // db-version 40
    /**
     * Time spent (in seconds) in the "Fast" cadence zone (for example: Running).
     */
-   private int                   cadenceZone_FastTime                        = -1;                     // db-version 40
+   private int                   cadenceZone_FastTime                        = 0;                     // db-version 40
    /**
     * The delimiter used when computing the existing values of cadenceZone_SlowTime & cadenceZone_FastTime
     */
@@ -565,7 +566,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    // ############################################# TRAINING #############################################
 
    /**
-    * Naming variants from Jes�s P�rez
+    * Naming variants from Jesús Pérez
     * <ul>
     * <li>Impact of training</li>
     * <li>Impact of effort</li>
@@ -663,6 +664,14 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
     * 0 == false, 1 == true
     */
    private short                  isStrideSensorPresent            = 0;
+
+   // ############################################# TRAINING STRESS DATA #############################################
+
+   /**
+    * GOVSS (Gravity Ordered Velocity Stress Score)
+    */
+   private int                govss;                                // db-version 41
+
 
    // ############################################# MERGED DATA #############################################
 
@@ -912,7 +921,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
     */
 
    /**
-    * Contains time in <b>seconds</b> relativ to the tour start which is defined in
+    * Contains time in <b>seconds</b> relative to the tour start which is defined in
     * {@link #tourStartTime}.
     * <p>
     * The array {@link #timeSerie} is <code>null</code> for a manually created tour, it is
@@ -1144,7 +1153,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 
    /**
     * Contains the rough geo parts of the tour or <code>null</code> when geo data are not available. A
-    * grid square is an integer of lat + 90� and lon + 180� multiplied by 100 (1570 m)
+    * grid square is an integer of lat + 90° and lon + 180° multiplied by 100 (1570 m)
     *
     * <pre>
 
@@ -1653,6 +1662,36 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 // SET_FORMATTING_ON
 
    public TourData() {}
+
+   public boolean canGovssBeComputed() {
+
+      if (tourPerson == null) {
+         return false;
+      }
+
+      // We make sure to retrieve the latest version of the tour's TourPerson in case it has been modified recently
+      // Note : It's not a "pretty" solution but that is the best I found as of today
+      final ArrayList<TourPerson> tourPersons = PersonManager.getTourPeople();
+      for (final TourPerson currentTourPerson : tourPersons) {
+         if (currentTourPerson.getPersonId() == tourPerson.getPersonId()) {
+            tourPerson = currentTourPerson;
+            break;
+         }
+      }
+
+      if (timeSerie == null || altitudeSerie == null || distanceSerie == null ||
+            tourPerson.getWeight() <= 0f || tourPerson.getHeight() <= 0f ||
+            tourType == null ||
+            !tourPerson.isTourTypeInGovssTourTypes(tourType.getTypeId())) {
+         //In case the govss was previously computed and the tour is not considered a tour for
+         //which the govss should be computed anymore
+         govss = 0;
+         return false;
+
+      }
+
+      return true;
+   }
 
    /**
     * Removed data series when the sum of all values is 0.
@@ -2406,6 +2445,38 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
     */
    public boolean computeAltitudeUpDown() {
 
+      if (altitudeSerie == null) {
+         return false;
+      }
+
+      final AltitudeUpDown altiUpDown = computeAltitudeUpDown(0, altitudeSerie.length - 1);
+
+      if (altiUpDown != null) {
+         setTourAltUp(altiUpDown.altitudeUp);
+         setTourAltDown(altiUpDown.altitudeDown);
+      }
+
+      return altiUpDown != null;
+   }
+
+   public AltitudeUpDown computeAltitudeUpDown(final ArrayList<AltitudeUpDownSegment> segmentSerieIndexParameter,
+                                               final float selectedMinAltiDiff) {
+
+      return computeAltitudeUpDown_30_Algorithm_9_08(segmentSerieIndexParameter, selectedMinAltiDiff);
+   }
+
+   /**
+    * Computes the elevation gain/loss values for a specific range.
+    *
+    * @param startIndex
+    *           The index of the range start
+    * @param endIndex
+    *           The index of the range end
+    * @return Returns an <code>AltitudeUpDown</code> when altitude was computed otherwise
+    *         <code>null</code>
+    */
+   public AltitudeUpDown computeAltitudeUpDown(final int startIndex, final int endIndex) {
+
       float prefDPTolerance;
 
       if (_isImportedMTTour) {
@@ -2420,9 +2491,9 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 
          // DP needs distance
 
-         altiUpDown = computeAltitudeUpDown_20_Algorithm_DP(prefDPTolerance);
+         altiUpDown = computeAltitudeUpDown_20_Algorithm_DP(prefDPTolerance, startIndex, endIndex);
 
-         // keep this value to see in the UI (toursegmenter) the value and how it is computed
+         // keep this value to see in the UI (tour segmenter) the value and how it is computed
          dpTolerance = (short) (prefDPTolerance * 10);
 
       } else {
@@ -2430,39 +2501,35 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
          altiUpDown = computeAltitudeUpDown_30_Algorithm_9_08(null, prefDPTolerance);
       }
 
-      if (altiUpDown == null) {
-         return false;
-      }
-
-      setTourAltUp(altiUpDown.altitudeUp);
-      setTourAltDown(altiUpDown.altitudeDown);
-
-      return true;
-   }
-
-   public AltitudeUpDown computeAltitudeUpDown(final ArrayList<AltitudeUpDownSegment> segmentSerieIndexParameter,
-                                               final float selectedMinAltiDiff) {
-
-      return computeAltitudeUpDown_30_Algorithm_9_08(segmentSerieIndexParameter, selectedMinAltiDiff);
+      return altiUpDown;
    }
 
    /**
-    * Compute altitude up/down with Douglas Peuker algorithm.
+    * Compute altitude up/down with Douglas Peucker algorithm.
     *
     * @param dpTolerance
+    *           The Douglas-Peucker tolerance value
+    * @param startIndex
+    *           The start of the section for which to compute the elevation gain/loss
+    * @param endIndex
+    *           The end of the section for which to compute the elevation gain/loss
     * @return Returns <code>null</code> when altitude up/down cannot be computed
     */
-   private AltitudeUpDown computeAltitudeUpDown_20_Algorithm_DP(final float dpTolerance) {
+   private AltitudeUpDown computeAltitudeUpDown_20_Algorithm_DP(final float dpTolerance, final int startIndex, final int endIndex) {
 
       // check if all necessary data are available
-      if (altitudeSerie == null || altitudeSerie.length < 2) {
+      if (altitudeSerie == null || altitudeSerie.length < 2 ||
+            startIndex > altitudeSerie.length || endIndex >= altitudeSerie.length ||
+            startIndex >= endIndex) {
          return null;
       }
 
       // convert data series into DP points
-      final DPPoint dpPoints[] = new DPPoint[distanceSerie.length];
-      for (int serieIndex = 0; serieIndex < dpPoints.length; serieIndex++) {
-         dpPoints[serieIndex] = new DPPoint(distanceSerie[serieIndex], altitudeSerie[serieIndex], serieIndex);
+      final DPPoint dpPoints[] = new DPPoint[endIndex - startIndex];
+      int dpPointsIndex = 0;
+      for (int serieIndex = startIndex; serieIndex < endIndex; serieIndex++) {
+         dpPoints[dpPointsIndex] = new DPPoint(distanceSerie[serieIndex], altitudeSerie[serieIndex], serieIndex);
+         dpPointsIndex++;
       }
 
       int[] forcedIndices = null;
@@ -2475,7 +2542,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
       float altitudeUpTotal = 0;
       float altitudeDownTotal = 0;
 
-      float prevAltitude = altitudeSerie[0];
+      float prevAltitude = altitudeSerie[startIndex];
 
       /*
        * Get altitude up/down from the tour altitude values which are found by DP
@@ -2483,7 +2550,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
       for (int dbIndex = 1; dbIndex < simplifiedPoints.length; dbIndex++) {
 
          final DPPoint point = simplifiedPoints[dbIndex];
-         final float currentAltitude = altitudeSerie[point.serieIndex];
+         final float currentAltitude = altitudeSerie[startIndex + point.serieIndex];
          final float altiDiff = currentAltitude - prevAltitude;
 
          if (altiDiff > 0) {
@@ -2501,7 +2568,8 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    /**
     * Compute altitude up/down since version 9.08
     * <p>
-    * This algorithm is abandond because it can cause very wrong values dependend on the terrain. DP
+    * This algorithm is abandoned because it can cause very wrong values depending on the terrain.
+    * DP
     * is the preferred algorithm since 14.7.
     *
     * @param segmentSerie
@@ -3353,6 +3421,8 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 
       computeGeo_Bounds();
       computeGeo_Grid();
+
+      ComputeTrainingStressData();
    }
 
    private void computeDataSeries_NotSmoothed() {
@@ -3997,6 +4067,19 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
       return returnData;
    }
 
+   public boolean computeGovss() {
+
+      if (canGovssBeComputed() == false) {
+         return false;
+      }
+
+      govss = new Govss(tourPerson, this).Compute();
+
+      tourPerson.addOrUpdateGovssEntry(tourStartTime, tourId);
+
+      return true;
+   }
+
    /**
     * Computes seconds for each hr zone and sets the number of available HR zones in
     * {@link #numberOfHrZones}.
@@ -4158,6 +4241,18 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
       }
    }
 
+   public double computeNormalizedPace(final int startIndex, final int endIndex) {
+      double result = 0;
+
+      if (canGovssBeComputed() == false) {
+         return result;
+      }
+
+      result = new Govss(tourPerson, this).ComputeNormalizedPace(startIndex, endIndex);
+
+      return result;
+   }
+
    private void computePhotoTimeAdjustment() {
 
       long allPhotoTimeAdjustment = 0;
@@ -4183,8 +4278,9 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
          return;
       }
 
-      final boolean isJametAlgorithm = _prefStore.getString(ITourbookPreferences.GRAPH_SMOOTHING_SMOOTHING_ALGORITHM).equals(
-            ISmoothingAlgorithm.SMOOTHING_ALGORITHM_JAMET);
+      final boolean isJametAlgorithm = _prefStore.getString(ITourbookPreferences.GRAPH_SMOOTHING_SMOOTHING_ALGORITHM)
+            .equals(
+                  ISmoothingAlgorithm.SMOOTHING_ALGORITHM_JAMET);
 
       if (isJametAlgorithm == false) {
 
@@ -4824,6 +4920,13 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
          final int tourDrivingTimeRaw = timeSerie[timeSerie.length - 1] - getBreakTime();
          tourDrivingTime = Math.max(0, tourDrivingTimeRaw);
       }
+   }
+
+   private void ComputeTrainingStressData() {
+      //TODO
+
+      //GOVSS
+      computeGovss();
    }
 
    private float[] convertDataSeries(final int[] intDataSerie, final int scale) {
@@ -6675,6 +6778,13 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    }
 
    /**
+    * @return the {@link #avgAltitudeChange}
+    */
+   public int getAvgAltitudeChange() {
+      return avgAltitudeChange;
+   }
+
+   /**
     * @return the avgCadence
     */
    public float getAvgCadence() {
@@ -6721,7 +6831,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
    }
 
    /**
-    * Computes break time between start and end index when and when a break occures
+    * Computes break time between start and end index when and when a break occurs
     *
     * @param startIndex
     * @param endIndex
@@ -7134,6 +7244,13 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
       }
 
       return _gpsBounds;
+   }
+
+   /**
+    * @return the {@link #govss}
+    */
+   public int getGovss() {
+      return govss;
    }
 
    /**
@@ -9727,6 +9844,8 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 
    public void setTourType(final TourType tourType) {
       this.tourType = tourType;
+
+      ComputeTrainingStressData();
    }
 
    public void setTraining_TrainingEffect_Aerob(final float trainingEffect) {
@@ -10441,7 +10560,7 @@ public class TourData implements Comparable<Object>, IXmlSerializable, Cloneable
 
    public String toStringWithHash() {
 
-      final String string = "" //$NON-NLS-1$
+      final String string = UI.EMPTY_STRING
             + ("   tourId: " + tourId) //$NON-NLS-1$
             + ("   identityHashCode: " + System.identityHashCode(this)); //$NON-NLS-1$
 

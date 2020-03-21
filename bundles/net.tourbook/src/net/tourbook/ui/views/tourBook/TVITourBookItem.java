@@ -19,11 +19,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.ZonedDateTime;
 
-import net.tourbook.common.UI;
 import net.tourbook.common.time.TimeTools;
 import net.tourbook.common.time.TourDateTime;
 import net.tourbook.common.util.TreeViewerItem;
 import net.tourbook.tour.ITourItem;
+import net.tourbook.tour.TourManager;
 
 public abstract class TVITourBookItem extends TreeViewerItem implements ITourItem {
 
@@ -319,17 +319,7 @@ public abstract class TVITourBookItem extends TreeViewerItem implements ITourIte
 
       colPausedTime = colTourRecordingTime - colTourDrivingTime;
 
-      colSlowVsFastCadence = UI.EMPTY_STRING;
-      final int totalCadenceZone_SlowTime = cadenceZone_SlowTime == -1 ? 0 : cadenceZone_SlowTime;
-      final int totalCadenceZone_FastTime = cadenceZone_FastTime == -1 ? 0 : cadenceZone_FastTime;
-
-      final int totalCadenceTime = totalCadenceZone_SlowTime + totalCadenceZone_FastTime;
-      if (totalCadenceTime != 0) {
-         final int cadenceZone_SlowPercentage = Math.round(totalCadenceZone_SlowTime * 100f / totalCadenceTime);
-         final int cadenceZone_FastPercentage = Math.round(totalCadenceZone_FastTime * 100f / totalCadenceTime);
-
-         colSlowVsFastCadence = cadenceZone_SlowPercentage + " - " + cadenceZone_FastPercentage; //$NON-NLS-1$
-      }
+      colSlowVsFastCadence = TourManager.generateCadenceZones_TimePercentages(cadenceZone_SlowTime, cadenceZone_FastTime);
    }
 
    @Override

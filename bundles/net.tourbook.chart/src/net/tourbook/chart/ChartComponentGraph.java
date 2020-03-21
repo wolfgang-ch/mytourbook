@@ -826,7 +826,7 @@ public class ChartComponentGraph extends Canvas {
       for (final GraphDrawingData graphDrawingData : allGraphDrawingData) {
 
          final ChartType chartType = graphDrawingData.getChartType();
-
+//TODO ASk wolfgang if we can support line and bars ?
          if (chartType != ChartType.LINE && chartType != ChartType.HORIZONTAL_BAR) {
             return false;
          }
@@ -6896,7 +6896,7 @@ public class ChartComponentGraph extends Canvas {
 
          final int devYSliderLine = devYMouse
                - _ySliderDragged.devYClickOffset
-               + ChartYSlider.halfSliderHitLineHeight;
+               + _ySliderDragged.getSliderHitLine_Above_GraphHorizontalAxis();
 
          _ySliderDragged.setDevYSliderLine(devYSliderLine);
          _ySliderGraphX = devXMouse;

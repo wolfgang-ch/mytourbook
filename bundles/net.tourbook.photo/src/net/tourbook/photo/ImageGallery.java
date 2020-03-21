@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -38,7 +38,6 @@ import net.tourbook.common.util.ITourViewer;
 import net.tourbook.common.util.LRUMap;
 import net.tourbook.common.util.StatusUtil;
 import net.tourbook.common.util.Util;
-import net.tourbook.common.weather.IWeather;
 import net.tourbook.photo.internal.Activator;
 import net.tourbook.photo.internal.GalleryActionBar;
 import net.tourbook.photo.internal.GalleryType;
@@ -1021,8 +1020,7 @@ public abstract class ImageGallery implements IItemListener, IGalleryContextMenu
             if (imageDirection == Double.MIN_VALUE) {
                cell.setText(UI.EMPTY_STRING);
             } else {
-               final int imageDirectionInt = (int) imageDirection;
-               cell.setText(getDirectionText(imageDirectionInt));
+               cell.setText(UI.getCardinalDirectionText((int) imageDirection * 10));
             }
          }
       });
@@ -1254,15 +1252,6 @@ public abstract class ImageGallery implements IItemListener, IGalleryContextMenu
     */
    public Composite getCustomActionBarContainer() {
       return _galleryActionBar.getCustomContainer();
-   }
-
-   private String getDirectionText(final int degreeDirection) {
-
-      final float degree = (degreeDirection + 22.5f) / 45.0f;
-
-      final int directionIndex = ((int) degree) % 8;
-
-      return IWeather.windDirectionText[directionIndex];
    }
 
    public FullScreenImageViewer getFullScreenImageViewer() {
@@ -1816,6 +1805,10 @@ public abstract class ImageGallery implements IItemListener, IGalleryContextMenu
    private void jobFilter_32_RunSubsequent() {
 
 //      final long start = System.nanoTime();
+
+      if (_allPhotos == null) {
+         return;
+      }
 
       final boolean isGPSFilter = _imageFilterGPS == PhotoFilterGPS.WITH_GPS;
       final boolean isNoGPSFilter = _imageFilterGPS == PhotoFilterGPS.NO_GPS;

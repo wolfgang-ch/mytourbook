@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -442,6 +442,10 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
       // Cadence zones delimiter
       store.setDefault(ITourbookPreferences.CADENCE_ZONES_DELIMITER, 70);
 
+      // Predicted performance decay values
+      store.setDefault(ITourbookPreferences.FITNESS_DECAY, 45);
+      store.setDefault(ITourbookPreferences.FATIGUE_DECAY, 15);
+
       /*
        * view column tooltip
        */
@@ -469,6 +473,8 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
       store.setDefault(ITourbookPreferences.VIEW_TOOLTIP_TOURIMPORT_TIME, true);
       store.setDefault(ITourbookPreferences.VIEW_TOOLTIP_TOURIMPORT_TITLE, true);
       store.setDefault(ITourbookPreferences.VIEW_TOOLTIP_TOURIMPORT_TAGS, true);
+
+      store.setDefault(ITourbookPreferences.VIEW_TOOLTIP_TOURCOMPARERESULT_TIME, true);
 
       /*
        * view actions

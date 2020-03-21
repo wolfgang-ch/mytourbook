@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -138,16 +138,12 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
 import org.eclipse.ui.progress.UIJob;
 import org.geotools.data.ows.OperationType;
 import org.geotools.data.ows.Service;
-import org.geotools.data.ows.WMSCapabilities;
-import org.geotools.data.ows.WMSRequest;
+import org.geotools.ows.wms.WMSCapabilities;
+import org.geotools.ows.wms.WMSRequest;
 
 public class PrefPage_Map2_Providers extends PreferencePage implements IWorkbenchPreferencePage, ITourViewer {
 
-// SET_FORMATTING_OFF
-
-   private static final String APP_TRUE   = net.tourbook.Messages.App__True;
-
-// SET_FORMATTING_ON
+   private static final String           APP_TRUE   = net.tourbook.Messages.App__True;
 
    public static final String            ID         = "de.byteholder.geoclipse.preferences.PrefPage_Map2_Providers";                          //$NON-NLS-1$
 
@@ -3010,7 +3006,7 @@ public class PrefPage_Map2_Providers extends PreferencePage implements IWorkbenc
          try {
 
             // create temp file name
-            final java.nio.file.Path tempFile = Files.createTempFile("MapProvider_", XML_EXTENSION);
+            final java.nio.file.Path tempFile = Files.createTempFile("MapProvider_", XML_EXTENSION);//$NON-NLS-1$
 
             tempFilePath = tempFile.toString();
 
