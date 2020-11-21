@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -99,34 +99,35 @@ public class TimeTools {
 
 // SET_FORMATTING_OFF
 
-   public static final DateTimeFormatter   Formatter_Date_S       = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT);
-   public static final DateTimeFormatter   Formatter_Date_M       = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM);
-   public static final DateTimeFormatter   Formatter_Date_L       = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG);
-   public static final DateTimeFormatter   Formatter_Date_F       = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL);
+   public static final DateTimeFormatter   Formatter_Date_S             = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT);
+   public static final DateTimeFormatter   Formatter_Date_M             = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM);
+   public static final DateTimeFormatter   Formatter_Date_L             = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG);
+   public static final DateTimeFormatter   Formatter_Date_F             = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL);
 
-   public static final DateTimeFormatter   Formatter_Time_S       = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT);
-   public static final DateTimeFormatter   Formatter_Time_M       = DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM);
-   public static final DateTimeFormatter   Formatter_Time_F       = DateTimeFormatter.ofLocalizedTime(FormatStyle.FULL);
+   public static final DateTimeFormatter   Formatter_Time_S             = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT);
+   public static final DateTimeFormatter   Formatter_Time_M             = DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM);
+   public static final DateTimeFormatter   Formatter_Time_F             = DateTimeFormatter.ofLocalizedTime(FormatStyle.FULL);
 
-   public static final DateTimeFormatter   Formatter_DateTime_S   = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT);
-   public static final DateTimeFormatter   Formatter_DateTime_SM  = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT,  FormatStyle.MEDIUM);
-   public static final DateTimeFormatter   Formatter_DateTime_M   = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM);
-   public static final DateTimeFormatter   Formatter_DateTime_MS  = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT);
-   public static final DateTimeFormatter   Formatter_DateTime_ML  = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.LONG);
-   public static final DateTimeFormatter   Formatter_DateTime_F   = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.FULL);
+   public static final DateTimeFormatter   Formatter_DateTime_S         = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT);
+   public static final DateTimeFormatter   Formatter_DateTime_SM        = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT,  FormatStyle.MEDIUM);
+   public static final DateTimeFormatter   Formatter_DateTime_M         = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM);
+   public static final DateTimeFormatter   Formatter_DateTime_MS        = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT);
+   public static final DateTimeFormatter   Formatter_DateTime_ML        = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.LONG);
+   public static final DateTimeFormatter   Formatter_DateTime_F         = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.FULL);
 
 
-   public static final DateTimeFormatter   Formatter_FileName     = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");    //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_FileName           = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");    //$NON-NLS-1$
 
-   public static final DateTimeFormatter   Formatter_Day          = DateTimeFormatter.ofPattern("d");                      //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_DayMonth     = DateTimeFormatter.ofPattern("d MMM");                  //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_DayMonthYear = DateTimeFormatter.ofPattern("d MMM uu");               //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_Month        = DateTimeFormatter.ofPattern("MMM");                    //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_Month_Full   = DateTimeFormatter.ofPattern("MMMM");                   //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_Week_Month   = DateTimeFormatter.ofPattern("dd MMM");                 //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_Weekday      = DateTimeFormatter.ofPattern("E");                      //$NON-NLS-1$
-   public static final DateTimeFormatter   Formatter_Weekday_L    = DateTimeFormatter.ofPattern("EEEE");                   //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Day                = DateTimeFormatter.ofPattern("d");                      //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_DayMonth           = DateTimeFormatter.ofPattern("d MMM");                  //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_DayMonthYear       = DateTimeFormatter.ofPattern("d MMM uu");               //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Month              = DateTimeFormatter.ofPattern("MMM");                    //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Month_Full         = DateTimeFormatter.ofPattern("MMMM");                   //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Week_Month         = DateTimeFormatter.ofPattern("dd MMM");                 //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Weekday            = DateTimeFormatter.ofPattern("E");                      //$NON-NLS-1$
+   public static final DateTimeFormatter   Formatter_Weekday_L          = DateTimeFormatter.ofPattern("EEEE");                   //$NON-NLS-1$
 
+   public static final DateTimeFormatter   Formatter_DayTimeSecondsAmPm = DateTimeFormatter.ofPattern("h:mm:ss a");              //$NON-NLS-1$
 
 // SET_FORMATTING_ON
 
@@ -145,6 +146,7 @@ public class TimeTools {
     * The date must not be in the first or last week of the year.
     */
    private static LocalDate               _dateToGetNumOfWeeks = LocalDate.of(2000, 5, 5);
+
    static {
 
       Formatter_Time_ISO = new DateTimeFormatterBuilder()
@@ -159,7 +161,7 @@ public class TimeTools {
             .toFormatter();
 
       DURATION_FORMATTER = new PeriodFormatterBuilder()
-            //
+
             .appendHours()
             .appendSuffix(Messages.Period_Format_Hour_Short, Messages.Period_Format_Hour_Short)
 
@@ -193,6 +195,7 @@ public class TimeTools {
             Formatter_Month_Full.format(Month.NOVEMBER),
             Formatter_Month_Full.format(Month.DECEMBER)
       };
+
       /*
        * Create week day names. Found no better solution, the old API contained
        * "DateFormatSymbols.getInstance().getShortWeekdays()"
@@ -450,7 +453,8 @@ public class TimeTools {
 
    /**
     * @param year
-    * @return Returns the number of weeks in a year.
+    * @return Returns the number of weeks in a year, this do NOT include weeks which are belonging
+    *         to other week years, e.g. 1.1.2012 is week 52 in weekyear 2011
     */
    public static int getNumberOfWeeksWithYear(final int year) {
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2020 Frédéric Bard and Contributors
+ * Copyright (C) 2021 Frédéric Bard and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -21,7 +21,8 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Group;
 
 public abstract class PrefPageTrainingStressModel {
-   public IPersonModifiedListener _personModifiedListener;
+
+   private IPersonModifiedListener _personModifiedListener;
 
    public interface IPersonModifiedListener {
       public abstract void onPersonModifiedListener();
@@ -32,6 +33,10 @@ public abstract class PrefPageTrainingStressModel {
    public abstract String getGroupName();
 
    public abstract Group getGroupUI(final Composite parent, final TourPerson tourPerson);
+
+   public IPersonModifiedListener getPersonModifiedListener() {
+      return _personModifiedListener;
+   }
 
    public abstract void restoreState();
 

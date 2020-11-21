@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2021 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Formatter;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import net.tourbook.Messages;
@@ -486,36 +487,36 @@ public class TourManager {
 
       if (tourId1 == tourId2 && tourData1 != tourData2) {
 
-         final StringBuilder sb = new StringBuilder()//
-               .append("ERROR: ") //$NON-NLS-1$
-               .append("The internal structure of the application is out of synch.") //$NON-NLS-1$
-               .append(UI.NEW_LINE2)
-               .append("You can solve the problem by:") //$NON-NLS-1$
-               .append(UI.NEW_LINE2)
-               .append("- restarting the application") //$NON-NLS-1$
-               .append(UI.NEW_LINE)
-               .append("- close the tour editor in all perspectives") //$NON-NLS-1$
-               .append(UI.NEW_LINE)
-               .append("- save/revert tour and select another tour") //$NON-NLS-1$
-               .append(UI.NEW_LINE2)
-               .append(UI.NEW_LINE)
-               .append("The tour editor contains the selected tour, but the data are different.") //$NON-NLS-1$
-               .append(UI.NEW_LINE2)
-               .append("Tour in Editor:") //$NON-NLS-1$
-               .append(tourData2.toStringWithHash())
-               .append(UI.NEW_LINE)
-               .append("Selected Tour:") //$NON-NLS-1$
-               .append(tourData1.toStringWithHash())
-               .append(UI.NEW_LINE2)
-               .append(UI.NEW_LINE)
-               .append("You should also inform the author of the application how this error occured. ") //$NON-NLS-1$
-               .append("However it isn't very easy to find out, what actions are exactly done, before this error occured. ") //$NON-NLS-1$
-               .append(UI.NEW_LINE2)
-               .append("These actions must be reproducable otherwise the bug cannot be identified."); //$NON-NLS-1$
+         final String message = UI.EMPTY_STRING
+               + "ERROR: " //                                                                                              //$NON-NLS-1$
+               + "The internal structure of the application is out of synch." //                                           //$NON-NLS-1$
+               + UI.NEW_LINE2
+               + "You can solve the problem by:" //                                                                        //$NON-NLS-1$
+               + UI.NEW_LINE2
+               + "- restarting the application" //                                                                         //$NON-NLS-1$
+               + UI.NEW_LINE
+               + "- close the tour editor in all perspectives" //                                                          //$NON-NLS-1$
+               + UI.NEW_LINE
+               + "- save/revert tour and select another tour" //                                                           //$NON-NLS-1$
+               + UI.NEW_LINE2
+               + UI.NEW_LINE
+               + "The tour editor contains the selected tour, but the data are different." //                              //$NON-NLS-1$
+               + UI.NEW_LINE2
+               + "Tour in Editor:" //                                                                                      //$NON-NLS-1$
+               + tourData2.toStringWithHash()
+               + UI.NEW_LINE
+               + "Selected Tour:" //                                                                                       //$NON-NLS-1$
+               + tourData1.toStringWithHash()
+               + UI.NEW_LINE2
+               + UI.NEW_LINE
+               + "You should also inform the author of the application how this error occured. " //                        //$NON-NLS-1$
+               + "However it isn't very easy to find out, what actions are exactly done, before this error occured. " //   //$NON-NLS-1$
+               + UI.NEW_LINE2
+               + "These actions must be reproducable otherwise the bug cannot be identified."; //                          //$NON-NLS-1$
 
-         MessageDialog.openError(Display.getCurrent().getActiveShell(), "Error: Out of Synch", sb.toString()); //$NON-NLS-1$
+         MessageDialog.openError(Display.getDefault().getActiveShell(), "Error: Out of Synch", message); //                //$NON-NLS-1$
 
-         throw new MyTourbookException(sb.toString());
+         throw new MyTourbookException(message);
       }
 
       return true;
@@ -680,7 +681,7 @@ public class TourManager {
     * @throws SQLException
     */
    public static boolean computeGovss(final Connection conn,
-                                      final ArrayList<TourData> selectedTours) throws SQLException {
+                                      final List<TourData> selectedTours) throws SQLException {
       boolean isUpdated = false;
 
       final PreparedStatement stmtUpdate = conn.prepareStatement(govss_StatementUpdate);
@@ -754,6 +755,28 @@ public class TourManager {
     * @param tourData
     * @param startIndex
     * @param endIndex
+    * @return Returns the elapsed time
+    */
+   public static int computeTourDeviceTime_Elapsed(final TourData tourData, final int startIndex, final int endIndex) {
+
+      final float[] distanceSerie = tourData.getMetricDistanceSerie();
+      final int[] timeSerie = tourData.timeSerie;
+
+      if (timeSerie == null
+            || timeSerie.length == 0
+            || startIndex >= distanceSerie.length
+            || endIndex >= distanceSerie.length
+            || startIndex > endIndex) {
+         return 0;
+      }
+
+      return timeSerie[endIndex] - timeSerie[startIndex];
+   }
+
+   /**
+    * @param tourData
+    * @param startIndex
+    * @param endIndex
     * @return Returns the distance
     */
    public static float computeTourDistance(final TourData tourData, final int startIndex, final int endIndex) {
@@ -769,28 +792,6 @@ public class TourManager {
       }
 
       return distanceSerie[endIndex] - distanceSerie[startIndex];
-   }
-
-   /**
-    * @param tourData
-    * @param startIndex
-    * @param endIndex
-    * @return Returns the recording time
-    */
-   public static int computeTourRecordingTime(final TourData tourData, final int startIndex, final int endIndex) {
-
-      final float[] distanceSerie = tourData.getMetricDistanceSerie();
-      final int[] timeSerie = tourData.timeSerie;
-
-      if (timeSerie == null
-            || timeSerie.length == 0
-            || startIndex >= distanceSerie.length
-            || endIndex >= distanceSerie.length
-            || startIndex > endIndex) {
-         return 0;
-      }
-
-      return timeSerie[endIndex] - timeSerie[startIndex];
    }
 
    /**
@@ -948,6 +949,8 @@ public class TourManager {
       final String[] allTourTitle = joinedTourData.multipleTourTitles = new String[numTours];
       final ArrayList<TourMarker> allTourMarker = joinedTourData.multiTourMarkers = new ArrayList<>();
       final int[] allTourMarkerNumbers = joinedTourData.multipleNumberOfMarkers = new int[numTours];
+      final ArrayList<List<Long>> allTourPauses = joinedTourData.multiTourPauses = new ArrayList<>();
+      final int[] allTourPausesNumbers = joinedTourData.multipleNumberOfPauses = new int[numTours];
       final int[] allSwimStartIndex = joinedTourData.multipleSwimStartIndex = new int[numTours];
 
       final HashSet<TourPhoto> allTourPhoto = new HashSet<>();
@@ -959,7 +962,9 @@ public class TourManager {
 
       int toStartIndex = 0;
       int toSwimStartIndex = 0;
-      int tourRecordingTime = 0;
+      int tourDeviceTime_Elapsed = 0;
+      int tourDeviceTime_Recorded = 0;
+      int tourDeviceTime_Paused = 0;
       float tourDistance = 0;
       float tourAltUp = 0;
       float tourAltDown = 0;
@@ -1049,12 +1054,12 @@ public class TourManager {
 
             // adjust relative time series
             for (int serieIndex = 0; serieIndex < fromSerieLength; serieIndex++) {
-               toTimeSerie[toStartIndex + serieIndex] = tourRecordingTime + fromTimeSerie[serieIndex];
+               toTimeSerie[toStartIndex + serieIndex] = tourDeviceTime_Elapsed + fromTimeSerie[serieIndex];
             }
             if (fromSwim_Time != null) {
                isSwim_Time = true;
                for (int swimSerieIndex = 0; swimSerieIndex < fromSwimSerieLength; swimSerieIndex++) {
-                  toSwim_Time[toSwimStartIndex + swimSerieIndex] = tourRecordingTime + fromSwim_Time[swimSerieIndex];
+                  toSwim_Time[toSwimStartIndex + swimSerieIndex] = tourDeviceTime_Elapsed + fromSwim_Time[swimSerieIndex];
                }
             }
 
@@ -1171,6 +1176,23 @@ public class TourManager {
          allTourMarker.addAll(fromTourMarker);
          allTourMarkerNumbers[tourIndex] = fromTourMarker.size();
 
+         // tour pauses
+         final long[] pausedTime_Start = fromTourData.getPausedTime_Start();
+
+         if (pausedTime_Start != null) {
+            final long[] pausedTime_End = fromTourData.getPausedTime_End();
+            for (int index = 0; index < pausedTime_Start.length; ++index) {
+
+               final List<Long> fromTourPausesList = new ArrayList<>();
+
+               fromTourPausesList.add(pausedTime_Start[index]);
+               fromTourPausesList.add(pausedTime_End[index]);
+
+               allTourPauses.add(fromTourPausesList);
+            }
+            allTourPausesNumbers[tourIndex] = pausedTime_Start.length;
+         }
+
          // photos
          final Set<TourPhoto> fromTourPhotos = fromTourData.getTourPhotos();
          allTourPhoto.addAll(fromTourPhotos);
@@ -1189,9 +1211,9 @@ public class TourManager {
             tourDistance += fromDistanceSerie[fromSerieLength - 1];
          }
 
-         // summarize recording time
+         // summarize elapsed time
          final int fromTourEnd = fromTimeSerie[fromSerieLength - 1];
-         tourRecordingTime += fromTourEnd;
+         tourDeviceTime_Elapsed += fromTourEnd;
 
          // summarize altitude up/down
          tourAltUp += fromTourData.getTourAltUp();
@@ -1209,7 +1231,10 @@ public class TourManager {
           * Add 1 otherwise the next tour has the same start time as the previous tour end time,
           * this is because it starts with 0.
           */
-         tourRecordingTime++;
+         tourDeviceTime_Elapsed++;
+
+         tourDeviceTime_Recorded += fromTourData.getTourDeviceTime_Recorded();
+         tourDeviceTime_Paused += fromTourData.getTourDeviceTime_Paused();
       }
 
       /*
@@ -1286,14 +1311,16 @@ public class TourManager {
       final ZonedDateTime tourStartTime = TimeTools.getZonedDateTime(firstTour.getTourStartTimeMS());
 
       joinedTourData.setTourStartTime(tourStartTime);
-      joinedTourData.setTourRecordingTime(tourRecordingTime);
+      joinedTourData.setTourDeviceTime_Elapsed(tourDeviceTime_Elapsed);
+      joinedTourData.setTourDeviceTime_Recorded(tourDeviceTime_Recorded);
+      joinedTourData.setTourDeviceTime_Paused(tourDeviceTime_Paused);
       joinedTourData.setTourDistance(tourDistance);
 
-      // computing these values is VERY cpu intensive because of the DP algorithm
+      // computing these values is VERY CPU intensive because of the DP algorithm
       joinedTourData.setTourAltUp(tourAltUp);
       joinedTourData.setTourAltDown(tourAltDown);
 
-      joinedTourData.computeTourDrivingTime();
+      joinedTourData.computeTourMovingTime();
       joinedTourData.computeComputedValues();
 
       joinedTourData.multipleTour_IsCadenceRpm = isCadenceRpm;
@@ -1439,10 +1466,12 @@ public class TourManager {
     * @return Returns a string of this format : "33 - 64"
     */
    public static String generateCadenceZones_TimePercentages(final int cadenceZoneSlowTime, final int cadenceZoneFastTime) {
+
       String cadenceZonesPercentages = UI.EMPTY_STRING;
 
       final int totalCadenceTime = cadenceZoneSlowTime + cadenceZoneFastTime;
       if (totalCadenceTime > 0) {
+
          final int cadenceZone_SlowPercentage = Math.round(cadenceZoneSlowTime * 100f / totalCadenceTime);
          final int cadenceZone_FastPercentage = Math.round(cadenceZoneFastTime * 100f / totalCadenceTime);
 
@@ -1537,7 +1566,7 @@ public class TourManager {
     */
    public static RGB getGraphColor(final String graphName, final String colorProfileName) {
 
-      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + graphName + "."; //$NON-NLS-1$
+      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + graphName + UI.SYMBOL_DOT;
 
       // get COLOR from common pref store
       final IPreferenceStore commonPrefStore = CommonActivator.getPrefStore();
@@ -1960,9 +1989,7 @@ public class TourManager {
              */
             new ProgressMonitorDialog(TourbookPlugin.getAppShell()).run(true, true, saveRunnable);
 
-         } catch (final InvocationTargetException e) {
-            StatusUtil.showStatus(e);
-         } catch (final InterruptedException e) {
+         } catch (final InvocationTargetException | InterruptedException e) {
             StatusUtil.showStatus(e);
          }
       }
@@ -2606,9 +2633,7 @@ public class TourManager {
 
             new ProgressMonitorDialog(TourbookPlugin.getAppShell()).run(true, false, saveRunnable);
 
-         } catch (final InvocationTargetException e) {
-            StatusUtil.showStatus(e);
-         } catch (final InterruptedException e) {
+         } catch (final InvocationTargetException | InterruptedException e) {
             StatusUtil.showStatus(e);
          }
       }
@@ -2752,7 +2777,7 @@ public class TourManager {
     */
    public static void setGraphColor(final ChartDataYSerie yData, final String graphName) {
 
-      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + graphName + "."; //$NON-NLS-1$
+      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + graphName + UI.SYMBOL_DOT;
 
       // get COLOR from common pref store
       final IPreferenceStore commonPrefStore = CommonActivator.getPrefStore();

@@ -128,7 +128,7 @@ public class PhotoImageLoader {
       }
 
       /*
-       * try to convert it to a jpg file
+       * try to convert it to a JPG file
        */
 
       String tempFilename = null;
@@ -196,8 +196,8 @@ public class PhotoImageLoader {
    }
 
    /**
-    * @return Returns roatation according to the EXIF data or <code>null</code> when image is not
-    *         rotatet.
+    * @return Returns rotation according to the EXIF data or <code>null</code> when image is not
+    *         rotated.
     */
    private Rotation getRotation() {
 
@@ -308,9 +308,7 @@ public class PhotoImageLoader {
                }
             }
          }
-      } catch (final ImageReadException e) {
-         StatusUtil.log(e);
-      } catch (final IOException e) {
+      } catch (final ImageReadException | IOException e) {
          StatusUtil.log(e);
       }
 
@@ -801,7 +799,7 @@ public class PhotoImageLoader {
       final long end = System.currentTimeMillis() - start;
 
       System.out.println(UI.timeStampNano() + " SWT: " //$NON-NLS-1$
-            + (Thread.currentThread().getName() + " " + _photo.imageFileName) //$NON-NLS-1$
+            + (Thread.currentThread().getName() + UI.SPACE1 + _photo.imageFileName)
             + ("\ttotal: " + end) //$NON-NLS-1$
             + ("\tload: " + endHqLoad) //$NON-NLS-1$
             + ("\tresizeHQ: " + endResizeHQ) //$NON-NLS-1$
@@ -945,7 +943,7 @@ public class PhotoImageLoader {
                      originalImageProperties);
 
                if (isSaved == false) {
-                  // AWT save error has occured, possible error: "Bogus input colorspace"
+                  // AWT save error has occurred, possible error: "Bogus input colorspace"
                   _photo.setThumbSaveError();
 
                }
@@ -1088,7 +1086,7 @@ public class PhotoImageLoader {
 
             if (isSaved == false) {
 
-               // AWT save error has occured, possible error: "Bogus input colorspace"
+               // AWT save error has occurred, possible error: "Bogus input colorspace"
                _photo.setThumbSaveError();
 
                if (requestedSWTImage == null) {
@@ -1129,7 +1127,7 @@ public class PhotoImageLoader {
       final long end = System.currentTimeMillis() - start;
 
       System.out.println(UI.timeStampNano() + " AWT: " //$NON-NLS-1$
-            + (Thread.currentThread().getName() + " " + _photo.imageFileName) //$NON-NLS-1$
+            + (Thread.currentThread().getName() + UI.SPACE1 + _photo.imageFileName)
             + ("\ttotal: " + end) //$NON-NLS-1$
             + ("\tload: " + endHqLoad) //$NON-NLS-1$
             + ("\tresizeHQ: " + endResizeHQ) //$NON-NLS-1$
@@ -1249,7 +1247,7 @@ public class PhotoImageLoader {
       } finally {
 
          /**
-          * The not thrown NO MORE HANDLE EXCEPTION cannot be catched therefore the check:
+          * The not thrown NO MORE HANDLE EXCEPTION cannot be caught therefore the check:
           * swtImage == null
           */
 
@@ -1299,7 +1297,7 @@ public class PhotoImageLoader {
 
          } else {
 
-            // image is loaded with requested quality or a SWT error has occured, reset image state
+            // image is loaded with requested quality or a SWT error has occurred, reset image state
             setStateUndefined();
          }
 
@@ -1307,7 +1305,7 @@ public class PhotoImageLoader {
 
          System.out.println(UI.timeStampNano() + " SWT: " //$NON-NLS-1$
                + Thread.currentThread().getName()
-               + " " //$NON-NLS-1$
+               + UI.SPACE1
                + _photo.imageFileName
                + ("\ttotal: " + end) //$NON-NLS-1$
                + ("\tload1: " + endOriginalLoad1) //$NON-NLS-1$
@@ -1328,19 +1326,16 @@ public class PhotoImageLoader {
    private void loadImageProperties(final IPath requestedStoreImageFilePath) {
 
       final IPath propPath = ThumbnailStore.getPropertiesPathFromImagePath(requestedStoreImageFilePath);
-      FileInputStream fileStream = null;
 
       Properties imageProperties = null;
 
-      try {
+      try (FileInputStream fileStream = new FileInputStream(propPath.toOSString())) {
 
          final File propFile = propPath.toFile();
 
          if (propFile.isFile() == false) {
             return;
          }
-
-         fileStream = new FileInputStream(propPath.toOSString());
 
          imageProperties = new Properties();
 
@@ -1349,15 +1344,6 @@ public class PhotoImageLoader {
       } catch (final IOException e) {
          StatusUtil.log(NLS.bind("Image properties cannot be loaded from: \"{0}\"", //$NON-NLS-1$
                propPath.toOSString()), e);
-      } finally {
-
-         if (fileStream != null) {
-            try {
-               fileStream.close();
-            } catch (final IOException e) {
-               StatusUtil.log(e);
-            }
-         }
       }
 
       if (imageProperties != null) {

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -54,6 +54,7 @@ import net.tourbook.extension.export.ExportTourExtension;
 import net.tourbook.tour.TourManager;
 import net.tourbook.ui.FileCollisionBehavior;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.apache.velocity.tools.generic.MathTool;
@@ -1009,7 +1010,7 @@ public class DialogExportTour extends TitleAreaDialog {
 
    private void doExport() throws IOException {
 
-      // disable button's
+      // disable buttons
       getButton(IDialogConstants.OK_ID).setEnabled(false);
       getButton(IDialogConstants.CANCEL_ID).setEnabled(false);
 
@@ -1109,9 +1110,7 @@ public class DialogExportTour extends TitleAreaDialog {
 
             new ProgressMonitorDialog(Display.getCurrent().getActiveShell()).run(true, true, exportRunnable);
 
-         } catch (final InvocationTargetException e) {
-            StatusUtil.showStatus(e);
-         } catch (final InterruptedException e) {
+         } catch (final InvocationTargetException | InterruptedException e) {
             StatusUtil.showStatus(e);
          }
 
@@ -1172,7 +1171,7 @@ public class DialogExportTour extends TitleAreaDialog {
          }
 
          /*
-          * There is currently no listener to stop the velocity evalute method
+          * There is currently no listener to stop the velocity evaluate method
           */
          monitor.subTask(NLS.bind(Messages.Dialog_Export_SubTask_CreatingExportFile, exportFileName));
 
@@ -1192,6 +1191,9 @@ public class DialogExportTour extends TitleAreaDialog {
             if (monitor.isCanceled()) {
                break;
             }
+
+            // merge distance is also used as total distance for not merged tours
+            _mergedDistance = 0;
 
             // create file path name
             final String tourFileName = net.tourbook.ui.UI.format_yyyymmdd_hhmmss(tourData);
@@ -1289,20 +1291,15 @@ public class DialogExportTour extends TitleAreaDialog {
 
       doExport_20_TourValues(vc);
 
-      final Writer exportWriter = new BufferedWriter(new OutputStreamWriter(
-            new FileOutputStream(exportFile),
-            UI.UTF_8));
-
-      final Reader templateReader = new InputStreamReader(this.getClass().getResourceAsStream(_formatTemplate));
-
-      try {
+      try (final FileOutputStream fileOutputStream = new FileOutputStream(exportFile);
+            final OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream, UI.UTF_8);
+            final Writer exportWriter = new BufferedWriter(outputStreamWriter);
+            final Reader templateReader = new InputStreamReader(this.getClass().getResourceAsStream(_formatTemplate))) {
 
          Velocity.evaluate(vc, exportWriter, "MyTourbook", templateReader); //$NON-NLS-1$
 
       } catch (final Exception e) {
          StatusUtil.showStatus(e);
-      } finally {
-         exportWriter.close();
       }
    }
 
@@ -1342,7 +1339,10 @@ public class DialogExportTour extends TitleAreaDialog {
          pluginMajorVersion = Integer.toString(version.getMajor());
          pluginMinorVersion = Integer.toString(version.getMinor());
          pluginMicroVersion = Integer.toString(version.getMicro());
-         pluginQualifierVersion = version.getQualifier();
+         final String versionQualifier = version.getQualifier();
+         if (StringUtils.isNumeric(versionQualifier)) {
+            pluginQualifierVersion = versionQualifier;
+         }
       }
 
       vcContext.put("pluginMajorVersion", pluginMajorVersion); //$NON-NLS-1$
@@ -1462,9 +1462,9 @@ public class DialogExportTour extends TitleAreaDialog {
       for (final Object name : tracks) {
 
          final GPSTrack track = (GPSTrack) name;
-         for (final Iterator<?> wpIter = track.getWaypoints().iterator(); wpIter.hasNext();) {
+         for (final Object waypoint : track.getWaypoints()) {
 
-            final GPSTrackpoint wp = (GPSTrackpoint) wpIter.next();
+            final GPSTrackpoint wp = (GPSTrackpoint) waypoint;
 
             // starttime, totaltime
             if (wp.getDate() != null) {
@@ -2391,7 +2391,7 @@ public class DialogExportTour extends TitleAreaDialog {
 
          String fileName = getExportFileName();
 
-         // remove extentions
+         // remove extensions
          final int extPos = fileName.indexOf('.');
          if (extPos != -1) {
             fileName = fileName.substring(0, extPos);

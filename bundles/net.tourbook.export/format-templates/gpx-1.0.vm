@@ -9,8 +9,8 @@
    xmlns:mt="net.tourbook/1"
    xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd 
    http://www.cluetrust.com/XML/GPXDATA/1/0 http://www.cluetrust.com/Schemas/gpxdata10.xsd 
-   http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www.garmin.com/xmlschemas/GpxExtensionsv3.xsd 
-   http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd"
+   http://www.garmin.com/xmlschemas/GpxExtensions/v3 https://www8.garmin.com/xmlschemas/GpxExtensionsv3.xsd 
+   http://www.garmin.com/xmlschemas/TrackPointExtension/v1 https://www8.garmin.com/xmlschemas/TrackPointExtensionv1.xsd"
    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
    <metadata>   
       <time>$dateformat.format($starttime)</time>
@@ -30,8 +30,10 @@
 ## time
          <mt:tourStartTime>$tourData.getTourStartTimeMS()</mt:tourStartTime>
          <mt:tourEndTime>$tourData.getTourEndTimeMS()</mt:tourEndTime>
-         <mt:tourDrivingTime>$tourData.tourDrivingTime</mt:tourDrivingTime>
-         <mt:tourRecordingTime>$tourData.tourRecordingTime</mt:tourRecordingTime>
+         <mt:tourComputedTime_Moving>$tourData.tourComputedTime_Moving</mt:tourComputedTime_Moving>
+         <mt:tourDeviceTime_Elapsed>$tourData.tourDeviceTime_Elapsed</mt:tourDeviceTime_Elapsed>
+         <mt:tourDeviceTime_Recorded>$tourData.tourDeviceTime_Recorded</mt:tourDeviceTime_Recorded>
+         <mt:tourDeviceTime_Paused>$tourData.tourDeviceTime_Paused</mt:tourDeviceTime_Paused>
 ## distance
          <mt:tourAltDown>$tourData.tourAltDown</mt:tourAltDown>
          <mt:tourAltUp>$tourData.tourAltUp</mt:tourAltUp>
@@ -40,7 +42,8 @@
          <mt:calories>$tourData.Calories</mt:calories>
          <mt:restPulse>$tourData.restPulse</mt:restPulse>
 ## other
-         <mt:bikerWeight>$tourData.getBodyWeight()</mt:bikerWeight>
+         <mt:bodyWeight>$tourData.getBodyWeight()</mt:bodyWeight>
+         <mt:bodyFat>$tourData.getBodyFat()</mt:bodyFat>
          <mt:conconiDeflection>$tourData.ConconiDeflection</mt:conconiDeflection>
          <mt:dpTolerance>$tourData.DpTolerance</mt:dpTolerance>
 ## weather
@@ -199,12 +202,12 @@
 #end
          <trkpt lat="$nf8.format($point.Latitude)" lon="$nf8.format($point.Longitude)">
 ##
-#if($point.getDate())
-            <time>$dateformat.format($point.Date)</time>
-#end
 ##
 #if($point.hasValidAltitude())
             <ele>$nf3.format($point.Altitude)</ele>
+#end
+#if($point.getDate())
+            <time>$dateformat.format($point.Date)</time>
 #end
 ##
 #if($point.hasValidExtention())

@@ -1,20 +1,21 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2018 Wolfgang Schramm and Contributors
- * 
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
+ *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
  * Foundation version 2 of the License.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
  *******************************************************************************/
 package net.tourbook.statistics.graphs;
 
+import gnu.trove.list.array.TFloatArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 
@@ -29,300 +30,462 @@ import java.util.HashMap;
 
 import net.tourbook.common.time.TimeTools;
 import net.tourbook.common.time.TourDateTime;
+import net.tourbook.common.util.SQL;
 import net.tourbook.data.TourPerson;
 import net.tourbook.data.TourType;
 import net.tourbook.database.TourDatabase;
 import net.tourbook.statistics.StatisticServices;
+import net.tourbook.tag.tour.filter.TourTagFilterSqlJoinBuilder;
 import net.tourbook.ui.SQLFilter;
 import net.tourbook.ui.TourTypeFilter;
 import net.tourbook.ui.UI;
 
 public class DataProvider_Tour_Time extends DataProvider {
 
-	private static DataProvider_Tour_Time	_instance;
+   private Long          _selectedTourId;
 
-	private Long							_selectedTourId;
+   private TourStatisticData_Time _tourDataTime;
 
-	private TourData_Time					_tourDataTime;
+   public String getRawStatisticValues(final boolean isShowSequenceNumbers) {
 
-	private DataProvider_Tour_Time() {}
+      if (_tourDataTime == null) {
+         return null;
+      }
 
-	public static DataProvider_Tour_Time getInstance() {
+      if (statistic_RawStatisticValues != null && isShowSequenceNumbers == statistic_isShowSequenceNumbers) {
+         return statistic_RawStatisticValues;
+      }
 
-		if (_instance == null) {
-			_instance = new DataProvider_Tour_Time();
-		}
+      final StringBuilder sb = new StringBuilder();
 
-		return _instance;
-	}
+      final String headerLine1 = UI.EMPTY_STRING
 
-	public Long getSelectedTourId() {
-		return _selectedTourId;
-	}
+            + (isShowSequenceNumbers ? HEAD1_DATA_NUMBER : UI.EMPTY_STRING)
 
-	/**
-	 * Retrieve chart data from the database
-	 * 
-	 * @param person
-	 * @param tourTypeFilter
-	 * @param lastYear
-	 * @param numberOfYears
-	 * @param isForceUpdate
-	 * @return
-	 */
-	TourData_Time getTourTimeData(	final TourPerson person,
-									final TourTypeFilter tourTypeFilter,
-									final int lastYear,
-									final int numberOfYears,
-									final boolean isForceUpdate) {
+            + HEAD1_DATE_YEAR
+            + HEAD1_DATE_MONTH
+            + HEAD1_DATE_DAY
+            + HEAD1_DATE_WEEK
 
-		// dont reload data which are already here
-		if (_activePerson == person
-				&& _activeTourTypeFilter == tourTypeFilter
-				&& _lastYear == lastYear
-				&& _numberOfYears == numberOfYears
-				&& isForceUpdate == false) {
-			return _tourDataTime;
-		}
+            + HEAD1_TOUR_TYPE
 
-		_activePerson = person;
-		_activeTourTypeFilter = tourTypeFilter;
+            + HEAD1_DEVICE_TIME_ELAPSED
+            + HEAD1_DEVICE_TIME_RECORDED
+            + HEAD1_DEVICE_TIME_PAUSED
+            + HEAD1_COMPUTED_TIME_MOVING
+            + HEAD1_COMPUTED_TIME_BREAK
 
-		_lastYear = lastYear;
-		_numberOfYears = numberOfYears;
+            + HEAD1_DISTANCE
+            + HEAD1_ELEVATION
 
-		initYearNumbers();
+      ;
 
-		int colorOffset = 0;
-		if (tourTypeFilter.showUndefinedTourTypes()) {
-			colorOffset = StatisticServices.TOUR_TYPE_COLOR_INDEX_OFFSET;
-		}
+      final String headerLine2 = UI.EMPTY_STRING
 
-		final ArrayList<TourType> tourTypeList = TourDatabase.getActiveTourTypes();
-		final TourType[] tourTypes = tourTypeList.toArray(new TourType[tourTypeList.size()]);
+            + (isShowSequenceNumbers ? HEAD2_DATA_NUMBER : UI.EMPTY_STRING)
 
-		final SQLFilter sqlFilter = new SQLFilter(SQLFilter.TAG_FILTER);
+            + HEAD2_DATE_YEAR
+            + HEAD2_DATE_MONTH
+            + HEAD2_DATE_DAY
+            + HEAD2_DATE_WEEK
 
-		final String sqlString = "SELECT " //$NON-NLS-1$
+            + HEAD2_TOUR_TYPE
 
-				+ "TourId," //					1 //$NON-NLS-1$
+            + HEAD2_DEVICE_TIME_ELAPSED
+            + HEAD2_DEVICE_TIME_RECORDED
+            + HEAD2_DEVICE_TIME_PAUSED
+            + HEAD2_COMPUTED_TIME_MOVING
+            + HEAD2_COMPUTED_TIME_BREAK
 
-				+ "StartYear," //				2 //$NON-NLS-1$
-				+ "StartMonth," //				3 //$NON-NLS-1$
-				+ "StartWeek," //				4 //$NON-NLS-1$
-				+ "TourStartTime," //			5 //$NON-NLS-1$
-				+ "TimeZoneId, "//				6 //$NON-NLS-1$
-				+ "TourRecordingTime," //		7 //$NON-NLS-1$
-				+ "TourDrivingTime,"//			8 //$NON-NLS-1$
+            + HEAD2_DISTANCE
+            + HEAD2_ELEVATION
 
-				+ "TourDistance," //			9 //$NON-NLS-1$
-				+ "TourAltUp," //				10 //$NON-NLS-1$
-				+ "TourTitle," //				11 //$NON-NLS-1$
-				+ "TourDescription," // 		12 //$NON-NLS-1$
+      ;
 
-				+ "TourType_typeId,"//			13 //$NON-NLS-1$
-				+ "jTdataTtag.TourTag_tagId"//	14 //$NON-NLS-1$
+      final String valueFormatting = UI.EMPTY_STRING
 
-				+ UI.NEW_LINE
+            + (isShowSequenceNumbers ? VALUE_DATA_NUMBER : "%s") //$NON-NLS-1$
 
-				+ (" FROM " + TourDatabase.TABLE_TOUR_DATA + UI.NEW_LINE) //$NON-NLS-1$
+            + VALUE_DATE_YEAR
+            + VALUE_DATE_MONTH
+            + VALUE_DATE_DAY
+            + VALUE_DATE_WEEK
 
-				// get tag id's
-				+ (" LEFT OUTER JOIN " + TourDatabase.JOINTABLE__TOURDATA__TOURTAG + " jTdataTtag") //$NON-NLS-1$ //$NON-NLS-2$
-				+ (" ON tourID = jTdataTtag.TourData_tourId") //$NON-NLS-1$
+            + VALUE_TOUR_TYPE
 
-				+ (" WHERE StartYear IN (" + getYearList(lastYear, numberOfYears) + ")" + UI.NEW_LINE) //$NON-NLS-1$ //$NON-NLS-2$
-				+ sqlFilter.getWhereClause()
+            + VALUE_DEVICE_TIME_ELAPSED
+            + VALUE_DEVICE_TIME_RECORDED
+            + VALUE_DEVICE_TIME_PAUSED
+            + VALUE_COMPUTED_TIME_MOVING
+            + VALUE_COMPUTED_TIME_BREAK
 
-				+ (" ORDER BY TourStartTime"); //$NON-NLS-1$
+            + VALUE_DISTANCE
+            + VALUE_ELEVATION
 
-		try {
+      ;
 
-			final TLongArrayList allTourIds = new TLongArrayList();
+      sb.append(headerLine1 + NL);
+      sb.append(headerLine2 + NL);
 
-			final TIntArrayList allTourYear = new TIntArrayList();
-			final TIntArrayList allTourMonths = new TIntArrayList();
-			final TIntArrayList allYearsDOY = new TIntArrayList(); // DOY...Day Of Year for all years
+      final int numDataItems = _tourDataTime.allTourDistances.length;
 
-			final TIntArrayList allTourStartTime = new TIntArrayList();
-			final TIntArrayList allTourEndTime = new TIntArrayList();
-			final TIntArrayList allTourStartWeek = new TIntArrayList();
-			final ArrayList<ZonedDateTime> allTourStartDateTime = new ArrayList<>();
-			final ArrayList<String> allTourTimeOffset = new ArrayList<>();
+      // set initial value
+      int prevMonth = numDataItems > 0 ? _tourDataTime.allTourMonths[0] : 0;
 
-			final TIntArrayList allTourRecordingTime = new TIntArrayList();
-			final TIntArrayList allTourDrivingTime = new TIntArrayList();
+      int sequenceNumber = 0;
 
-			final TIntArrayList allDistance = new TIntArrayList();
-			final TIntArrayList allAltitudeUp = new TIntArrayList();
+      for (int dataIndex = 0; dataIndex < numDataItems; dataIndex++) {
 
-			final ArrayList<String> allTourTitle = new ArrayList<String>();
-			final ArrayList<String> allTourDescription = new ArrayList<String>();
+         final int month = _tourDataTime.allTourMonths[dataIndex];
 
-			final TLongArrayList allTypeIds = new TLongArrayList();
-			final TIntArrayList allTypeColorIndex = new TIntArrayList();
+         // group by month
+         if (month != prevMonth) {
+            prevMonth = month;
+            sb.append(NL);
+         }
 
-			final HashMap<Long, ArrayList<Long>> allTagIds = new HashMap<Long, ArrayList<Long>>();
+         final int elapsedTime = _tourDataTime.allTourDeviceTime_Elapsed[dataIndex];
+         final int movingTime = _tourDataTime.allTourComputedTime_Moving[dataIndex];
+         final int breakTime = elapsedTime - movingTime;
 
-			long lastTourId = -1;
-			ArrayList<Long> tagIds = null;
+         Object sequenceNumberValue = UI.EMPTY_STRING;
+         if (isShowSequenceNumbers) {
+            sequenceNumberValue = ++sequenceNumber;
+         }
 
-			final Connection conn = TourDatabase.getInstance().getConnection();
+         sb.append(String.format(valueFormatting,
 
-			final PreparedStatement statement = conn.prepareStatement(sqlString);
-			sqlFilter.setParameters(statement, 1);
+               sequenceNumberValue,
 
-			final ResultSet result = statement.executeQuery();
-			while (result.next()) {
+               _tourDataTime.allTourYears[dataIndex],
+               month,
+               _tourDataTime.allTourDays[dataIndex],
+               _tourDataTime.allWeeks[dataIndex],
 
-				final long dbTourId = result.getLong(1);
-				final Object dbTagId = result.getObject(14);
+               TourDatabase.getTourTypeName(_tourDataTime.allTypeIds[dataIndex]),
 
-				if (dbTourId == lastTourId) {
+               elapsedTime,
+               _tourDataTime.allTourDeviceTime_Recorded[dataIndex],
+               _tourDataTime.allTourDeviceTime_Paused[dataIndex],
+               movingTime,
+               breakTime,
 
-					// get additional tags from outer join
+               _tourDataTime.allTourDistances[dataIndex],
+               _tourDataTime.allTourElevations[dataIndex]
 
-					if (dbTagId instanceof Long) {
-						tagIds.add((Long) dbTagId);
-					}
+         ));
 
-				} else {
+         sb.append(NL);
+      }
 
-					// get first record for a tour
+      // cache values
+      statistic_RawStatisticValues = sb.toString();
+      statistic_isShowSequenceNumbers = isShowSequenceNumbers;
 
-					allTourIds.add(dbTourId);
+      return statistic_RawStatisticValues;
+   }
 
-					final int dbTourYear = result.getShort(2);
-					final int dbTourMonth = result.getShort(3) - 1;
+   public Long getSelectedTourId() {
+      return _selectedTourId;
+   }
 
-					final int dbTourStartWeek = result.getInt(4);
+   /**
+    * Retrieve chart data from the database
+    *
+    * @param person
+    * @param tourTypeFilter
+    * @param lastYear
+    * @param numberOfYears
+    * @param isForceUpdate
+    * @return
+    */
+   TourStatisticData_Time getTourTimeData(final TourPerson person,
+                                 final TourTypeFilter tourTypeFilter,
+                                 final int lastYear,
+                                 final int numberOfYears,
+                                 final boolean isForceUpdate) {
 
-					final long dbStartTimeMilli = result.getLong(5);
-					final String dbTimeZoneId = result.getString(6);
-					final int dbRecordingTime = result.getInt(7);
-					final int dbDrivingTime = result.getInt(8);
+      // don't reload data which are already here
+      if (statistic_ActivePerson == person
+            && statistic_ActiveTourTypeFilter == tourTypeFilter
+            && statistic_LastYear == lastYear
+            && statistic_NumberOfYears == numberOfYears
+            && isForceUpdate == false) {
 
-					final float dbDistance = result.getFloat(9);
-					final int dbAltitudeUp = result.getInt(10);
+         return _tourDataTime;
+      }
 
-					final String dbTourTitle = result.getString(11);
-					final String dbDescription = result.getString(12);
-					final Object dbTypeIdObject = result.getObject(13);
+      // reset cached values
+      statistic_RawStatisticValues = null;
 
-					final TourDateTime tourDateTime = TimeTools.createTourDateTime(dbStartTimeMilli, dbTimeZoneId);
-					final ZonedDateTime zonedStartDateTime = tourDateTime.tourZonedDateTime;
+      String sql = null;
 
-					// get number of days for the year, start with 0
-					final int tourDOY = tourDateTime.tourZonedDateTime.get(ChronoField.DAY_OF_YEAR) - 1;
+      try (Connection conn = TourDatabase.getInstance().getConnection()) {
 
-					final int startDayTime = (zonedStartDateTime.getHour() * 3600)
-							+ (zonedStartDateTime.getMinute() * 60)
-							+ zonedStartDateTime.getSecond();
+         statistic_ActivePerson = person;
+         statistic_ActiveTourTypeFilter = tourTypeFilter;
 
-					allTourYear.add(dbTourYear);
-					allTourMonths.add(dbTourMonth);
-					allYearsDOY.add(getYearDOYs(dbTourYear) + tourDOY);
-					allTourStartWeek.add(dbTourStartWeek);
+         statistic_LastYear = lastYear;
+         statistic_NumberOfYears = numberOfYears;
 
-					allTourStartDateTime.add(zonedStartDateTime);
-					allTourTimeOffset.add(tourDateTime.timeZoneOffsetLabel);
-					allTourStartTime.add(startDayTime);
-					allTourEndTime.add((startDayTime + dbRecordingTime));
-					allTourRecordingTime.add(dbRecordingTime);
-					allTourDrivingTime.add(dbDrivingTime);
+         setupYearNumbers();
 
-					allDistance.add((int) (dbDistance / UI.UNIT_VALUE_DISTANCE));
-					allAltitudeUp.add((int) (dbAltitudeUp / UI.UNIT_VALUE_ALTITUDE));
+         int colorOffset = 0;
+         if (tourTypeFilter.showUndefinedTourTypes()) {
+            colorOffset = StatisticServices.TOUR_TYPE_COLOR_INDEX_OFFSET;
+         }
 
-					allTourTitle.add(dbTourTitle);
+         final ArrayList<TourType> tourTypeList = TourDatabase.getActiveTourTypes();
+         final TourType[] tourTypes = tourTypeList.toArray(new TourType[tourTypeList.size()]);
 
-					allTourDescription.add(dbDescription == null ? UI.EMPTY_STRING : dbDescription);
+         final SQLFilter sqlAppFilter = new SQLFilter(SQLFilter.TAG_FILTER);
 
-					if (dbTagId instanceof Long) {
-						tagIds = new ArrayList<Long>();
-						tagIds.add((Long) dbTagId);
+         final TourTagFilterSqlJoinBuilder tagFilterSqlJoinBuilder = new TourTagFilterSqlJoinBuilder();
 
-						allTagIds.put(dbTourId, tagIds);
-					}
+         sql = UI.EMPTY_STRING
 
-					/*
-					 * convert type id to the type index in the tour type array, this is also the
-					 * color index for the tour type
-					 */
-					int colorIndex = 0;
-					long dbTypeId = TourDatabase.ENTITY_IS_NOT_SAVED;
+               + "SELECT" + NL //                                                   //$NON-NLS-1$
 
-					if (dbTypeIdObject instanceof Long) {
+               + "   TourId," + NL //                                            1  //$NON-NLS-1$
 
-						dbTypeId = (Long) dbTypeIdObject;
+               + "   StartYear," + NL //                                         2  //$NON-NLS-1$
+               + "   StartMonth," + NL //                                        3  //$NON-NLS-1$
+               + "   StartWeek," + NL //                                         4  //$NON-NLS-1$
 
-						for (int typeIndex = 0; typeIndex < tourTypes.length; typeIndex++) {
-							if (tourTypes[typeIndex].getTypeId() == dbTypeId) {
-								colorIndex = colorOffset + typeIndex;
-								break;
-							}
-						}
-					}
+               + "   TourStartTime," + NL //                                     5  //$NON-NLS-1$
+               + "   TimeZoneId," + NL //                                        6  //$NON-NLS-1$
 
-					allTypeColorIndex.add(colorIndex);
-					allTypeIds.add(dbTypeId);
-				}
+               + "   TourDeviceTime_Elapsed," + NL //                            7  //$NON-NLS-1$
+               + "   TourDeviceTime_Recorded," + NL //                           8  //$NON-NLS-1$
+               + "   TourDeviceTime_Paused," + NL //                             9  //$NON-NLS-1$
+               + "   TourComputedTime_Moving," + NL //                           10 //$NON-NLS-1$
 
-				lastTourId = dbTourId;
-			}
+               + "   TourDistance," + NL //                                      11 //$NON-NLS-1$
+               + "   TourAltUp," + NL //                                         12 //$NON-NLS-1$
 
-			conn.close();
+               + "   TourTitle," + NL //                                         13 //$NON-NLS-1$
+               + "   TourDescription," + NL //                                   14 //$NON-NLS-1$
 
-			// get number of days for all years
-			int yearDays = 0;
-			for (final int doy : _yearDays) {
-				yearDays += doy;
-			}
+               + "   TourType_typeId," + NL //                                   15 //$NON-NLS-1$
+               + "   jTdataTtag.TourTag_tagId" + NL //                           16 //$NON-NLS-1$
 
-			/*
-			 * create data
-			 */
-			_tourDataTime = new TourData_Time();
+               + " FROM " + TourDatabase.TABLE_TOUR_DATA + UI.NEW_LINE //           //$NON-NLS-1$
 
-			_tourDataTime.tourIds = allTourIds.toArray();
+               // get/filter tag id's
+               + tagFilterSqlJoinBuilder.getSqlTagJoinTable() + " jTdataTtag" //    //$NON-NLS-1$
+               + " ON TourId = jTdataTtag.TourData_tourId" + NL //                  //$NON-NLS-1$
 
-			_tourDataTime.typeIds = allTypeIds.toArray();
-			_tourDataTime.typeColorIndex = allTypeColorIndex.toArray();
+               + " WHERE StartYear IN (" + getYearList(lastYear, numberOfYears) + ")" + UI.NEW_LINE //$NON-NLS-1$ //$NON-NLS-2$
+               + "   " + sqlAppFilter.getWhereClause() //$NON-NLS-1$
 
-			_tourDataTime.tagIds = allTagIds;
+               + " ORDER BY TourStartTime"; //                                      //$NON-NLS-1$
 
-			_tourDataTime.allDaysInAllYears = yearDays;
-			_tourDataTime.yearDays = _yearDays;
-			_tourDataTime.years = _years;
+         final TLongArrayList allTourIds = new TLongArrayList();
 
-			_tourDataTime.tourYearValues = allTourYear.toArray();
-			_tourDataTime.tourMonthValues = allTourMonths.toArray();
-			_tourDataTime.tourDOYValues = allYearsDOY.toArray();
-			_tourDataTime.weekValues = allTourStartWeek.toArray();
+         final TIntArrayList allTourYear = new TIntArrayList();
+         final TIntArrayList allTourMonths = new TIntArrayList();
+         final TIntArrayList allTourDays = new TIntArrayList();
+         final TIntArrayList allYearsDOY = new TIntArrayList(); // DOY...Day Of Year for all years
 
-			_tourDataTime.tourTimeStartValues = allTourStartTime.toArray();
-			_tourDataTime.tourTimeZoneOffset = allTourTimeOffset;
-			_tourDataTime.tourTimeEndValues = allTourEndTime.toArray();
-			_tourDataTime.tourStartDateTimes = allTourStartDateTime;
+         final TIntArrayList allTourStartTime = new TIntArrayList();
+         final TIntArrayList allTourEndTime = new TIntArrayList();
+         final TIntArrayList allTourStartWeek = new TIntArrayList();
+         final ArrayList<ZonedDateTime> allTourStartDateTime = new ArrayList<>();
+         final ArrayList<String> allTourTimeOffset = new ArrayList<>();
 
-			_tourDataTime.tourDistanceValues = allDistance.toArray();
-			_tourDataTime.tourAltitudeValues = allAltitudeUp.toArray();
+         final TIntArrayList allTourDeviceTime_Elapsed = new TIntArrayList();
+         final TIntArrayList allTourDeviceTime_Recorded = new TIntArrayList();
+         final TIntArrayList allTourDeviceTime_Paused = new TIntArrayList();
+         final TIntArrayList allTourComputedTime_Moving = new TIntArrayList();
 
-			_tourDataTime.tourRecordingTimeValues = allTourRecordingTime.toArray();
-			_tourDataTime.tourDrivingTimeValues = allTourDrivingTime.toArray();
+         final TFloatArrayList allDistances = new TFloatArrayList();
+         final TFloatArrayList allElevationUp = new TFloatArrayList();
 
-			_tourDataTime.tourTitle = allTourTitle;
-			_tourDataTime.tourDescription = allTourDescription;
+         final ArrayList<String> allTourTitle = new ArrayList<>();
+         final ArrayList<String> allTourDescription = new ArrayList<>();
 
-		} catch (final SQLException e) {
-			UI.showSQLException(e);
-		}
+         final TLongArrayList allTypeIds = new TLongArrayList();
+         final TIntArrayList allTypeColorIndex = new TIntArrayList();
 
-		return _tourDataTime;
-	}
+         final HashMap<Long, ArrayList<Long>> allTagIds = new HashMap<>();
 
-	void setSelectedTourId(final Long selectedTourId) {
-		_selectedTourId = selectedTourId;
-	}
+         long lastTourId = -1;
+         ArrayList<Long> tagIds = null;
 
+         final PreparedStatement prepStmt = conn.prepareStatement(sql);
+
+         int paramIndex = 1;
+         paramIndex = tagFilterSqlJoinBuilder.setParameters(prepStmt, paramIndex);
+
+         sqlAppFilter.setParameters(prepStmt, paramIndex);
+
+         final ResultSet result = prepStmt.executeQuery();
+         while (result.next()) {
+
+            final long dbTourId = result.getLong(1);
+            final Object dbTagId = result.getObject(15);
+
+            if (dbTourId == lastTourId) {
+
+               // get additional tags from outer join
+
+               if (dbTagId instanceof Long) {
+                  tagIds.add((Long) dbTagId);
+               }
+
+            } else {
+
+               // get first record for a tour
+
+               allTourIds.add(dbTourId);
+
+// SET_FORMATTING_OFF
+
+               final int dbTourYear             = result.getShort(2);
+               final int dbTourMonth            = result.getShort(3);
+
+               final int dbTourStartWeek        = result.getInt(4);
+
+               final long dbStartTimeMilli      = result.getLong(5);
+               final String dbTimeZoneId        = result.getString(6);
+
+               final int dbElapsedTime          = result.getInt(7);
+               final int dbRecordedTime         = result.getInt(8);
+               final int dbPausedTime           = result.getInt(9);
+               final int dbMovingTime           = result.getInt(10);
+
+               final float dbDistance           = result.getFloat(11);
+               final int dbAltitudeUp           = result.getInt(12);
+
+               final String dbTourTitle         = result.getString(13);
+               final String dbDescription       = result.getString(14);
+
+               final Object dbTypeIdObject      = result.getObject(15);
+
+// SET_FORMATTING_ON
+
+               final TourDateTime tourDateTime = TimeTools.createTourDateTime(dbStartTimeMilli, dbTimeZoneId);
+               final ZonedDateTime zonedStartDateTime = tourDateTime.tourZonedDateTime;
+
+               // get number of days for the year, start with 0
+               final int tourDOY = zonedStartDateTime.get(ChronoField.DAY_OF_YEAR) - 1;
+
+               zonedStartDateTime.getDayOfMonth();
+
+               final int startDayTime = (zonedStartDateTime.getHour() * 3600)
+                     + (zonedStartDateTime.getMinute() * 60)
+                     + zonedStartDateTime.getSecond();
+
+               allTourYear.add(dbTourYear);
+               allTourMonths.add(dbTourMonth);
+               allTourDays.add(zonedStartDateTime.getDayOfMonth());
+
+               allYearsDOY.add(getYearDOYs(dbTourYear) + tourDOY);
+               allTourStartWeek.add(dbTourStartWeek);
+
+               allTourStartDateTime.add(zonedStartDateTime);
+               allTourTimeOffset.add(tourDateTime.timeZoneOffsetLabel);
+               allTourStartTime.add(startDayTime);
+               allTourEndTime.add((startDayTime + dbRecordedTime));
+
+               allTourDeviceTime_Elapsed.add(dbElapsedTime);
+               allTourDeviceTime_Recorded.add(dbRecordedTime);
+               allTourDeviceTime_Paused.add(dbPausedTime);
+               allTourComputedTime_Moving.add(dbMovingTime);
+
+               allDistances.add(dbDistance / UI.UNIT_VALUE_DISTANCE);
+               allElevationUp.add(dbAltitudeUp / UI.UNIT_VALUE_ALTITUDE);
+
+               allTourTitle.add(dbTourTitle);
+
+               allTourDescription.add(dbDescription == null ? UI.EMPTY_STRING : dbDescription);
+
+               if (dbTagId instanceof Long) {
+                  tagIds = new ArrayList<>();
+                  tagIds.add((Long) dbTagId);
+
+                  allTagIds.put(dbTourId, tagIds);
+               }
+
+               /*
+                * convert type id to the type index in the tour type array, this is also the
+                * color index for the tour type
+                */
+               int colorIndex = 0;
+               long dbTypeId = TourDatabase.ENTITY_IS_NOT_SAVED;
+
+               if (dbTypeIdObject instanceof Long) {
+
+                  dbTypeId = (Long) dbTypeIdObject;
+
+                  for (int typeIndex = 0; typeIndex < tourTypes.length; typeIndex++) {
+                     if (tourTypes[typeIndex].getTypeId() == dbTypeId) {
+                        colorIndex = colorOffset + typeIndex;
+                        break;
+                     }
+                  }
+               }
+
+               allTypeColorIndex.add(colorIndex);
+               allTypeIds.add(dbTypeId);
+            }
+
+            lastTourId = dbTourId;
+         }
+
+         // get number of days for all years
+         int numDaysInAllYears = 0;
+         for (final int doy : allYear_NumDays) {
+            numDaysInAllYears += doy;
+         }
+
+         /*
+          * create data
+          */
+         _tourDataTime = new TourStatisticData_Time();
+
+         _tourDataTime.allTourIds = allTourIds.toArray();
+
+         _tourDataTime.allTypeIds = allTypeIds.toArray();
+         _tourDataTime.allTypeColorIndices = allTypeColorIndex.toArray();
+
+         _tourDataTime.allTagIds = allTagIds;
+
+         _tourDataTime.numDaysInAllYears = numDaysInAllYears;
+         _tourDataTime.allYear_NumDays = allYear_NumDays;
+         _tourDataTime.allYear_Numbers = allYear_Numbers;
+
+         _tourDataTime.allTourYears = allTourYear.toArray();
+         _tourDataTime.allTourMonths = allTourMonths.toArray();
+         _tourDataTime.allTourDays = allTourDays.toArray();
+
+         _tourDataTime.allTourDOYs = allYearsDOY.toArray();
+         _tourDataTime.allWeeks = allTourStartWeek.toArray();
+
+         _tourDataTime.allTourTimeStart = allTourStartTime.toArray();
+         _tourDataTime.allTourTimeEnd = allTourEndTime.toArray();
+         _tourDataTime.allTourTimeZoneOffsets = allTourTimeOffset;
+         _tourDataTime.allTourStartDateTimes = allTourStartDateTime;
+
+         _tourDataTime.allTourDistances = allDistances.toArray();
+         _tourDataTime.allTourElevations = allElevationUp.toArray();
+
+         _tourDataTime.allTourDeviceTime_Elapsed = allTourDeviceTime_Elapsed.toArray();
+         _tourDataTime.allTourDeviceTime_Recorded = allTourDeviceTime_Recorded.toArray();
+         _tourDataTime.allTourDeviceTime_Paused = allTourDeviceTime_Paused.toArray();
+         _tourDataTime.allTourComputedTime_Moving = allTourComputedTime_Moving.toArray();
+
+         _tourDataTime.allTourTitles = allTourTitle;
+         _tourDataTime.allTourDescriptions = allTourDescription;
+
+      } catch (final SQLException e) {
+         SQL.showException(e, sql);
+      }
+
+      return _tourDataTime;
+   }
+
+   void setSelectedTourId(final Long selectedTourId) {
+      _selectedTourId = selectedTourId;
+   }
 }

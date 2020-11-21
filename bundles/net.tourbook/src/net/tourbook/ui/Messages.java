@@ -61,6 +61,12 @@ public class Messages extends NLS {
    public static String        ColumnFactory_BreakTime_Header;
    public static String        ColumnFactory_BreakTime_Label;
    public static String        ColumnFactory_BreakTime_Tooltip;
+   public static String        ColumnFactory_break_time_relative_label;
+   public static String        ColumnFactory_break_relative_time;
+   public static String        ColumnFactory_break_time_relative_tooltip;
+   public static String        ColumnFactory_break_time;
+   public static String        ColumnFactory_break_time_label;
+   public static String        ColumnFactory_break_time_tooltip;
    public static String        ColumnFactory_cadence;
    public static String        ColumnFactory_cadence_label;
    public static String        ColumnFactory_cadence_tooltip;
@@ -81,9 +87,9 @@ public class Messages extends NLS {
    public static String        ColumnFactory_distance_tooltip;
    public static String        ColumnFactory_distanceTotal_label;
    public static String        ColumnFactory_distanceTotal_tooltip;
-   public static String        ColumnFactory_driving_time;
-   public static String        ColumnFactory_driving_time_label;
-   public static String        ColumnFactory_driving_time_tooltip;
+   public static String        ColumnFactory_moving_time;
+   public static String        ColumnFactory_moving_time_label;
+   public static String        ColumnFactory_moving_time_tooltip;
    public static String        ColumnFactory_avg_gradient;
    public static String        ColumnFactory_avg_gradient_label;
    public static String        ColumnFactory_avg_gradient_tooltip;
@@ -114,11 +120,8 @@ public class Messages extends NLS {
    public static String        ColumnFactory_max_speed_tooltip;
    public static String        ColumnFactory_pace_label;
    public static String        ColumnFactory_pace_tooltip;
-   public static String        ColumnFactory_paused_relative_time;
    public static String        ColumnFactory_paused_time;
    public static String        ColumnFactory_paused_time_label;
-   public static String        ColumnFactory_paused_time_relative_label;
-   public static String        ColumnFactory_paused_time_relative_tooltip;
    public static String        ColumnFactory_paused_time_tooltip;
    public static String        ColumnFactory_power;
    public static String        ColumnFactory_power_label;
@@ -130,11 +133,14 @@ public class Messages extends NLS {
    public static String        ColumnFactory_pulse_difference;
    public static String        ColumnFactory_pulse_label;
    public static String        ColumnFactory_pulse_tooltip;
-   public static String        ColumnFactory_recording_time;
-   public static String        ColumnFactory_recording_time_label;
-   public static String        ColumnFactory_recording_time_tooltip;
-   public static String        ColumnFactory_recording_timeTotal_label;
-   public static String        ColumnFactory_recording_timeTotal_tooltip;
+   public static String        ColumnFactory_recorded_time;
+   public static String        ColumnFactory_recorded_time_label;
+   public static String        ColumnFactory_recorded_time_tooltip;
+   public static String        ColumnFactory_elapsed_time;
+   public static String        ColumnFactory_elapsed_time_label;
+   public static String        ColumnFactory_elapsed_time_tooltip;
+   public static String        ColumnFactory_elapsed_timeTotal_label;
+   public static String        ColumnFactory_elapsed_timeTotal_tooltip;
    public static String        ColumnFactory_reference_tour;
    public static String        ColumnFactory_sequence;
    public static String        ColumnFactory_sequence_label;
@@ -155,7 +161,7 @@ public class Messages extends NLS {
    public static String        ColumnFactory_tour_marker_label;
    public static String        ColumnFactory_tour_marker_tooltip;
    public static String        ColumnFactory_tour_numbers;
-   public static String        ColumnFactory_tour_numbers_lable;
+   public static String        ColumnFactory_tour_numbers_label;
    public static String        ColumnFactory_tour_numbers_tooltip;
    public static String        ColumnFactory_tour_tag_label;
    public static String        ColumnFactory_tour_tag_tooltip;
@@ -258,8 +264,6 @@ public class Messages extends NLS {
    public static String        ColumnFactory_NumberOfTours_Tooltip;
    public static String        ColumnFactory_Pace_Normalized_Label;
    public static String        ColumnFactory_Pace_Normalized_Tooltip;
-   public static String        ColumnFactory_PaceDelta_Label;
-   public static String        ColumnFactory_PaceDelta_Tooltip;
    public static String        ColumnFactory_PhotoTimeAdjustment_Header;
    public static String        ColumnFactory_PhotoTimeAdjustment_Label;
    public static String        ColumnFactory_PhotoTimeAdjustment_Tooltip;
@@ -354,10 +358,10 @@ public class Messages extends NLS {
    public static String        ColumnFactory_Surfing_NumberOfEvents_Header;
    public static String        ColumnFactory_Surfing_NumberOfEvents_Label;
 
-   public static String        ColumnFactory_Swim_Cadence_Label;
-   public static String        ColumnFactory_Swim_Cadence_Tooltip;
-   public static String        ColumnFactory_Swim_Strokes_Label;
-   public static String        ColumnFactory_Swim_Strokes_Tooltip;
+   public static String        ColumnFactory_Swim_StrokeRate_Label;
+   public static String        ColumnFactory_Swim_StrokeRate_Tooltip;
+   public static String        ColumnFactory_Swim_StrokesPerLength_Label;
+   public static String        ColumnFactory_Swim_StrokesPerLength_Tooltip;
    public static String        ColumnFactory_Swim_StrokeStyle_Label;
    public static String        ColumnFactory_Swim_StrokeStyle_Tooltip;
 
@@ -462,12 +466,20 @@ public class Messages extends NLS {
 
    public static String        Segmenter_Tooltip_Label_Altimeter;
    public static String        Segmenter_Tooltip_Label_AltitudeDifference;
-   public static String        Segmenter_Tooltip_Label_BreakTime;
+   public static String        Segmenter_Tooltip_Label_ComputedTime_Break;
    public static String        Segmenter_Tooltip_Label_Distance;
    public static String        Segmenter_Tooltip_Label_Gradient;
-   public static String        Segmenter_Tooltip_Label_MovingTime;
-   public static String        Segmenter_Tooltip_Label_RecordingTime;
+   public static String        Segmenter_Tooltip_Label_ComputedTime_Moving;
+   public static String        Segmenter_Tooltip_Label_DeviceTime_Elapsed;
+   public static String        Segmenter_Tooltip_Label_DeviceTime_Recorded;
+   public static String        Segmenter_Tooltip_Label_DeviceTime_Paused;
    public static String        Segmenter_Tooltip_Label_Title;
+
+   public static String        Statistic_Tooltip_Label_ColumnHeader_Percentage;
+   public static String        Statistic_Tooltip_Label_ColumnHeader_Percentage_Tooltip;
+   public static String        Statistic_Tooltip_Label_Distance;
+   public static String        Statistic_Tooltip_Label_Elevation;
+   public static String        Statistic_Tooltip_Label_NumberOfTours;
 
    public static String        Tooltip_WayPoint_Label_Altitude;
    public static String        Tooltip_WayPoint_Label_Category;
@@ -504,11 +516,14 @@ public class Messages extends NLS {
    public static String        Tour_Tooltip_Label_GearShifts;
    public static String        Tour_Tooltip_Label_Hour;
    public static String        Tour_Tooltip_Label_MaxAltitude;
+   public static String        Tour_Tooltip_Label_MaxPace;
    public static String        Tour_Tooltip_Label_MaxPulse;
    public static String        Tour_Tooltip_Label_MaxSpeed;
    public static String        Tour_Tooltip_Label_MovingTime;
    public static String        Tour_Tooltip_Label_NoTour;
-   public static String        Tour_Tooltip_Label_RecordingTime;
+   public static String        Tour_Tooltip_Label_ElapsedTime;
+   public static String        Tour_Tooltip_Label_PausedTime;
+   public static String        Tour_Tooltip_Label_RecordedTime;
    public static String        Tour_Tooltip_Label_RestPulse;
    public static String        Tour_Tooltip_Label_RunDyn_StanceTime_Avg;
    public static String        Tour_Tooltip_Label_RunDyn_StanceTime_Max;

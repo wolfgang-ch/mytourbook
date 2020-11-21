@@ -95,6 +95,7 @@ import net.tourbook.map2.action.ActionShowSliderInMap;
 import net.tourbook.map2.action.ActionShowStartEndInMap;
 import net.tourbook.map2.action.ActionShowTourInfoInMap;
 import net.tourbook.map2.action.ActionShowTourMarker;
+import net.tourbook.map2.action.ActionShowTourPauses;
 import net.tourbook.map2.action.ActionShowWayPoints;
 import net.tourbook.map2.action.ActionSyncMapWithOtherMap;
 import net.tourbook.map2.action.ActionSyncMapWithPhoto;
@@ -234,6 +235,7 @@ public class Map2View extends ViewPart implements
 
    private static final String   MEMENTO_SHOW_START_END_IN_MAP                         = "action.show-start-end-in-map";                       //$NON-NLS-1$
    private static final String   MEMENTO_SHOW_TOUR_MARKER                              = "action.show-tour-marker";                            //$NON-NLS-1$
+   private static final String   MEMENTO_SHOW_TOUR_PAUSES                              = "action.show-tour-pauses";                            //$NON-NLS-1$
    static final String           MEMENTO_SHOW_SLIDER_IN_MAP                            = "action.show-slider-in-map";                          //$NON-NLS-1$
    static final boolean          MEMENTO_SHOW_SLIDER_IN_MAP_DEFAULT                    = true;
    private static final String   MEMENTO_SHOW_SLIDER_IN_LEGEND                         = "action.show-slider-in-legend";                       //$NON-NLS-1$
@@ -451,6 +453,7 @@ public class Map2View extends ViewPart implements
    private ActionShowTour                 _actionShowTour;
    private ActionShowTourInfoInMap        _actionShowTourInfoInMap;
    private ActionShowTourMarker           _actionShowTourMarker;
+   private ActionShowTourPauses           _actionShowTourPauses;
    private ActionShowWayPoints            _actionShowWayPoints;
    private ActionSyncZoomLevelAdjustment  _actionSyncZoomLevelAdjustment;
    private ActionSyncMapWithOtherMap      _actionSyncMap_WithOtherMap;
@@ -569,7 +572,7 @@ public class Map2View extends ViewPart implements
 
    public void action_SyncWith_ChartSlider() {
 
-      if (_allTourData.size() == 0) {
+      if (_allTourData.isEmpty()) {
          return;
       }
 
@@ -659,7 +662,7 @@ public class Map2View extends ViewPart implements
 
    public void action_SyncWith_Tour() {
 
-      if (_allTourData.size() == 0) {
+      if (_allTourData.isEmpty()) {
          return;
       }
 
@@ -795,6 +798,14 @@ public class Map2View extends ViewPart implements
       _map.paint();
    }
 
+   public void actionSetShowTourPausesInMap() {
+
+      _tourPainterConfig.isShowTourPauses = _actionShowTourPauses.isChecked();
+
+      _map.disposeOverlayImageCache();
+      _map.paint();
+   }
+
    public void actionSetShowWayPointsInMap() {
 
       final boolean isShowWayPoints = _actionShowWayPoints.isChecked();
@@ -874,7 +885,7 @@ public class Map2View extends ViewPart implements
 
    public void actionShowSlider() {
 
-      if ((_allTourData == null) || (_allTourData.size() == 0)) {
+      if (_allTourData.isEmpty()) {
          return;
       }
 
@@ -1050,18 +1061,15 @@ public class Map2View extends ViewPart implements
 
          private void onPartVisible(final IWorkbenchPartReference partRef) {
 
-            if (partRef.getPart(false) == Map2View.this) {
+            if (partRef.getPart(false) == Map2View.this && !_isPartVisible) {
 
-               if (_isPartVisible == false) {
+               _isPartVisible = true;
 
-                  _isPartVisible = true;
+               if (_selectionWhenHidden != null) {
 
-                  if (_selectionWhenHidden != null) {
+                  onSelectionChanged(_selectionWhenHidden, true);
 
-                     onSelectionChanged(_selectionWhenHidden, true);
-
-                     _selectionWhenHidden = null;
-                  }
+                  _selectionWhenHidden = null;
                }
             }
          }
@@ -1156,9 +1164,13 @@ public class Map2View extends ViewPart implements
 
                _map.paint();
 
-            } else if (property.equals(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD)) {
+            } else if (property.equals(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD)
+                  || property.equals(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD_WARNING)) {
 
-               _map.setTourPaintMethodEnhanced(event.getNewValue().equals(PrefPageMap2Appearance.TOUR_PAINT_METHOD_COMPLEX));
+               final String tourPaintMethod = _prefStore.getString(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD);
+               final boolean isShowPaintingMethodWarning = _prefStore.getBoolean(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD_WARNING);
+
+               _map.setTourPaintMethodEnhanced(PrefPageMap2Appearance.TOUR_PAINT_METHOD_COMPLEX.equals(tourPaintMethod), isShowPaintingMethodWarning);
 
             } else if (property.equals(ITourbookPreferences.GRAPH_COLORS_HAS_CHANGED)
                   || property.equals(ITourbookPreferences.MAP2_OPTIONS_IS_MODIFIED)) {
@@ -1229,7 +1241,7 @@ public class Map2View extends ViewPart implements
             } else if ((eventId == TourEventId.TOUR_CHANGED) && (eventData instanceof TourEvent)) {
 
                final ArrayList<TourData> modifiedTours = ((TourEvent) eventData).getModifiedTours();
-               if ((modifiedTours != null) && (modifiedTours.size() > 0)) {
+               if ((modifiedTours != null) && (!modifiedTours.isEmpty())) {
 
                   _allTourData.clear();
                   _allTourData.addAll(modifiedTours);
@@ -1476,6 +1488,7 @@ public class Map2View extends ViewPart implements
       _actionShowTour = new ActionShowTour();
       _actionShowTourInfoInMap = new ActionShowTourInfoInMap(this);
       _actionShowTourMarker = new ActionShowTourMarker(this);
+      _actionShowTourPauses = new ActionShowTourPauses(this);
       _actionShowWayPoints = new ActionShowWayPoints(this);
 
       _actionReloadFailedMapImages = new ActionReloadFailedMapImages(this);
@@ -1536,8 +1549,7 @@ public class Map2View extends ViewPart implements
       } else if (mapColorProvider instanceof IDiscreteColorProvider) {
 
          isDataAvailable = createLegendImage_20_SetProviderValues(
-               (IDiscreteColorProvider) mapColorProvider,
-               legendHeightNoMargin);
+               (IDiscreteColorProvider) mapColorProvider);
       }
 
       final Color transparentColor = new Color(display, rgbTransparent);
@@ -1558,17 +1570,14 @@ public class Map2View extends ViewPart implements
       _mapLegend.setImage(legendImage);
    }
 
-   private boolean createLegendImage_20_SetProviderValues(final IDiscreteColorProvider legendProvider,
-                                                          final int legendHeight) {
+   private boolean createLegendImage_20_SetProviderValues(final IDiscreteColorProvider legendProvider) {
 
-      if (_allTourData.size() == 0) {
+      if (_allTourData.isEmpty()) {
          return false;
       }
 
       // tell the legend provider how to draw the legend
-      switch (legendProvider.getGraphId()) {
-
-      case HrZone:
+      if (legendProvider.getGraphId().equals(MapGraphId.HrZone)) {
 
          boolean isValidData = false;
 
@@ -1582,9 +1591,6 @@ public class Map2View extends ViewPart implements
          }
 
          return isValidData;
-
-      default:
-         break;
       }
 
       return false;
@@ -1608,7 +1614,8 @@ public class Map2View extends ViewPart implements
       _map.setMeasurementSystem(net.tourbook.ui.UI.UNIT_VALUE_DISTANCE, UI.UNIT_LABEL_DISTANCE);
 
       final String tourPaintMethod = _prefStore.getString(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD);
-      _map.setTourPaintMethodEnhanced(PrefPageMap2Appearance.TOUR_PAINT_METHOD_COMPLEX.equals(tourPaintMethod));
+      final boolean isShowPaintingMethodWarning = _prefStore.getBoolean(ITourbookPreferences.MAP_LAYOUT_TOUR_PAINT_METHOD_WARNING);
+      _map.setTourPaintMethodEnhanced(PrefPageMap2Appearance.TOUR_PAINT_METHOD_COMPLEX.equals(tourPaintMethod), isShowPaintingMethodWarning);
 
       // setup tool tip's
       _map.setTourToolTip(_tourToolTip = new TourToolTip(_map));
@@ -1674,7 +1681,7 @@ public class Map2View extends ViewPart implements
             restoreState();
             enableActions();
 
-            if (_allTourData.size() == 0) {
+            if (_allTourData.isEmpty()) {
                // a tour is not displayed, find a tour provider which provides a tour
                showToursFromTourProvider();
             } else {
@@ -1776,8 +1783,8 @@ public class Map2View extends ViewPart implements
          }
       }
 
-      final boolean isAllPhotoAvailable = _allPhotos.size() > 0;
-      final boolean isFilteredPhotoAvailable = _filteredPhotos.size() > 0;
+      final boolean isAllPhotoAvailable = !_allPhotos.isEmpty();
+      final boolean isFilteredPhotoAvailable = !_filteredPhotos.isEmpty();
       final boolean canShowFilteredPhoto = isFilteredPhotoAvailable && _isShowPhoto;
 
       /*
@@ -1813,6 +1820,7 @@ public class Map2View extends ViewPart implements
       _actionShowTourInfoInMap.setEnabled(isOneTour);
       _actionShowTour.setEnabled(_isTourOrWayPoint);
       _actionShowTourMarker.setEnabled(_isTourOrWayPoint);
+      _actionShowTourPauses.setEnabled(_isTourOrWayPoint);
       _actionShowWayPoints.setEnabled(_isTourOrWayPoint);
       _actionZoom_Centered.setEnabled(isTourAvailable);
       _actionZoom_ShowEntireTour.setEnabled(_isTourOrWayPoint && _isShowTour && isTourAvailable);
@@ -1936,6 +1944,7 @@ public class Map2View extends ViewPart implements
       menuMgr.add(new Separator());
       menuMgr.add(_actionCreateTourMarkerFromMap);
       menuMgr.add(_actionShowTourMarker);
+      menuMgr.add(_actionShowTourPauses);
       menuMgr.add(_actionShowWayPoints);
       menuMgr.add(_actionShowPOI);
       menuMgr.add(_actionShowStartEndInMap);
@@ -2061,7 +2070,7 @@ public class Map2View extends ViewPart implements
 
       TourGeoFilter_Loader.stopLoading(_geoFilter_PreviousGeoLoaderItem);
 
-      // delay geo part loader, moving the mouse can occure very often
+      // delay geo part loader, moving the mouse can occur very often
       _parent.getDisplay().timerExec(50, new Runnable() {
 
          private int __runningId = runnableRunningId;
@@ -2310,7 +2319,7 @@ public class Map2View extends ViewPart implements
 
       final int serieSize = latitudeSerie.length;
 
-      // check bounds -> this problem occured several times
+      // check bounds -> this problem occurred several times
       if (valueIndex1 >= serieSize) {
          valueIndex1 = serieSize - 1;
       }
@@ -2453,13 +2462,13 @@ public class Map2View extends ViewPart implements
          hideGeoGrid();
 
          final ArrayList<Long> tourIds = ((SelectionTourIds) selection).getTourIds();
-         if (tourIds.size() == 0) {
+         if (tourIds.isEmpty()) {
 
             // history tour (without tours) is displayed
 
             final ArrayList<Photo> allPhotos = paintPhotoSelection(selection);
 
-            if (allPhotos.size() > 0) {
+            if (!allPhotos.isEmpty()) {
 
 //               centerPhotos(allPhotos, false);
                showDefaultMap(true);
@@ -2506,7 +2515,7 @@ public class Map2View extends ViewPart implements
 
          } else {
 
-            // use old behaviour
+            // use old behavior
 
             final ChartDataModel chartDataModel = chartInfo.chartDataModel;
             if (chartDataModel != null) {
@@ -3000,7 +3009,7 @@ public class Map2View extends ViewPart implements
     */
    private void paintTours_10_All() {
 
-      if (_allTourData.size() == 0) {
+      if (_allTourData.isEmpty()) {
          _tourInfoToolTipProvider.setTourData(null);
          return;
       }
@@ -3068,7 +3077,7 @@ public class Map2View extends ViewPart implements
       _allTourData.add(tourData);
       _hash_AllTourData = _allTourData.hashCode();
 
-      // reset also ALL tour id's, otherwiese a reselected multiple tour is not displayed
+      // reset also ALL tour id's, otherwise a reselected multiple tour is not displayed
       // it took some time to debug this issue !!!
       _hash_AllTourIds = tourData.getTourId().hashCode();
 
@@ -3350,7 +3359,7 @@ public class Map2View extends ViewPart implements
 
    private void resetMap() {
 
-      if (_allTourData.size() == 0) {
+      if (_allTourData.isEmpty()) {
          return;
       }
 
@@ -3413,6 +3422,11 @@ public class Map2View extends ViewPart implements
       final boolean isShowMarker = Util.getStateBoolean(_state, MEMENTO_SHOW_TOUR_MARKER, true);
       _actionShowTourMarker.setChecked(isShowMarker);
       _tourPainterConfig.isShowTourMarker = isShowMarker;
+
+      // show tour pauses
+      final boolean isShowPauses = Util.getStateBoolean(_state, MEMENTO_SHOW_TOUR_PAUSES, true);
+      _actionShowTourPauses.setChecked(isShowPauses);
+      _tourPainterConfig.isShowTourPauses = isShowPauses;
 
       // checkbox: show way points
       final boolean isShowWayPoints = Util.getStateBoolean(_state, MEMENTO_SHOW_WAY_POINTS, true);
@@ -3676,6 +3690,7 @@ public class Map2View extends ViewPart implements
       _state.put(MEMENTO_SHOW_SLIDER_IN_MAP, _actionShowSliderInMap.isChecked());
       _state.put(MEMENTO_SHOW_SLIDER_IN_LEGEND, _actionShowSliderInLegend.isChecked());
       _state.put(MEMENTO_SHOW_TOUR_MARKER, _actionShowTourMarker.isChecked());
+      _state.put(MEMENTO_SHOW_TOUR_PAUSES, _actionShowTourPauses.isChecked());
       _state.put(MEMENTO_SHOW_TOUR_INFO_IN_MAP, _actionShowTourInfoInMap.isChecked());
       _state.put(MEMENTO_SHOW_WAY_POINTS, _actionShowWayPoints.isChecked());
 
@@ -3729,7 +3744,7 @@ public class Map2View extends ViewPart implements
 
    private void selectTourSegments(final SelectedTourSegmenterSegments selectedSegmenterConfig) {
 
-      if (_allTourData.size() < 1) {
+      if (_allTourData.isEmpty()) {
          return;
       }
 
@@ -3770,7 +3785,7 @@ public class Map2View extends ViewPart implements
 
       } else {
 
-         // multiple tourdata, I'm not sure if this still occures after merging multiple tours into one tourdata
+         // multiple tourdata, I'm not sure if this still occurs after merging multiple tours into one tourdata
       }
    }
 
@@ -3856,7 +3871,7 @@ public class Map2View extends ViewPart implements
             /*
              * check if tour is set from a selection provider
              */
-            if (_allTourData.size() > 0) {
+            if (!_allTourData.isEmpty()) {
                return;
             }
 
@@ -4002,6 +4017,8 @@ public class Map2View extends ViewPart implements
          _allTourData.add(tourData);
          _hash_AllTourData = _allTourData.hashCode();
          _hash_AllTourIds = tourData.getTourId().hashCode();
+
+         _map.tourBreadcrumb().resetTours();
 
          paintTours_10_All();
       }

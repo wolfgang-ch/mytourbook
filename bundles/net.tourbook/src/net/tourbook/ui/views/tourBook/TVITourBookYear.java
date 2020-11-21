@@ -27,15 +27,18 @@ import java.util.ArrayList;
 import net.tourbook.common.UI;
 import net.tourbook.common.time.TimeTools;
 import net.tourbook.common.time.TourDateTime;
+import net.tourbook.common.util.SQL;
 import net.tourbook.common.util.TreeViewerItem;
 import net.tourbook.database.TourDatabase;
+import net.tourbook.tag.tour.filter.TourTagFilterManager;
+import net.tourbook.tag.tour.filter.TourTagFilterSqlJoinBuilder;
 import net.tourbook.ui.SQLFilter;
 
 public class TVITourBookYear extends TVITourBookItem {
 
    private static final String YEAR_WEEK_FORMAT = "[%02d] %s"; //$NON-NLS-1$
 
-   private YearSubCategory     _subCategory;
+   private TourBookViewLayout  _subCategory;
 
    boolean                     isRowSummary;
 
@@ -43,7 +46,7 @@ public class TVITourBookYear extends TVITourBookItem {
 
       super(view);
 
-      _subCategory = view.getYearSub();
+      _subCategory = view.getViewLayout();
 
       setParentItem(parentItem);
    }
@@ -51,100 +54,113 @@ public class TVITourBookYear extends TVITourBookItem {
    @Override
    protected void fetchChildren() {
 
-      final boolean isWeekDisplayed = _subCategory == YearSubCategory.WEEK;
+      String sql = null;
 
-      final ArrayList<TreeViewerItem> children = new ArrayList<>();
-      setChildren(children);
+      try (Connection conn = TourDatabase.getInstance().getConnection()) {
 
-      String sumYearField = UI.EMPTY_STRING;
-      String sumYearFieldSub = UI.EMPTY_STRING;
+         final boolean isWeekDisplayed = _subCategory == TourBookViewLayout.CATEGORY_WEEK;
 
-      if (isWeekDisplayed) {
+         final ArrayList<TreeViewerItem> children = new ArrayList<>();
+         setChildren(children);
 
-         // show weeks
+         String sqlSumYearField = UI.EMPTY_STRING;
+         String sqlSumYearFieldSub = UI.EMPTY_STRING;
 
-         sumYearField = "StartWeekYear"; //$NON-NLS-1$
-         sumYearFieldSub = "StartWeek"; //$NON-NLS-1$
+         if (isWeekDisplayed) {
 
-      } else {
+            // show weeks
 
-         // show months
+            sqlSumYearField = "StartWeekYear"; //$NON-NLS-1$
+            sqlSumYearFieldSub = "StartWeek"; //$NON-NLS-1$
 
-         sumYearField = "StartYear"; //$NON-NLS-1$
-         sumYearFieldSub = "StartMonth"; //$NON-NLS-1$
-      }
+         } else {
 
-      final SQLFilter sqlFilter = new SQLFilter(SQLFilter.TAG_FILTER);
-      String fromTourData;
+            // show months
 
-      if (sqlFilter.isTagFilterActive()) {
+            sqlSumYearField = "StartYear"; //$NON-NLS-1$
+            sqlSumYearFieldSub = "StartMonth"; //$NON-NLS-1$
+         }
 
-         // with tag filter
+         final SQLFilter sqlAppFilter = new SQLFilter(SQLFilter.TAG_FILTER);
+         String sqlFromTourData;
 
-         fromTourData = NL
+         final TourTagFilterSqlJoinBuilder tagFilterSqlJoinBuilder = new TourTagFilterSqlJoinBuilder();
 
-               + "FROM (                  " + NL //$NON-NLS-1$
+         if (TourTagFilterManager.isTourTagFilterEnabled()) {
 
-               + " SELECT                 " + NL //$NON-NLS-1$
+            // with tag filter
 
-               + sumYearField + ",        " + NL //$NON-NLS-1$
-               + sumYearFieldSub + ",     " + NL //$NON-NLS-1$
-               + SQL_SUM_FIELDS + NL
+            sqlFromTourData = NL
 
-               + "  FROM " + TourDatabase.TABLE_TOUR_DATA + NL//$NON-NLS-1$
+                  + "FROM (" + NL //                                                   //$NON-NLS-1$
 
-               // get tag id's
-               + "  LEFT OUTER JOIN " + TourDatabase.JOINTABLE__TOURDATA__TOURTAG + " jTdataTtag" + NL //$NON-NLS-1$ //$NON-NLS-2$
-               + "  ON tourID = jTdataTtag.TourData_tourId" + NL //$NON-NLS-1$
+                  + "   SELECT" + NL //                                                //$NON-NLS-1$
 
-               + "  WHERE " + sumYearField + "=?" + NL //$NON-NLS-1$ //$NON-NLS-2$
-               + sqlFilter.getWhereClause()
+                  // this is necessary otherwise tours can occure multiple times when a tour contains multiple tags !!!
+                  + "      DISTINCT TourId," + NL //                                   //$NON-NLS-1$
 
-               + ") td                    " + NL//$NON-NLS-1$
+                  + "      " + sqlSumYearField + "," + NL //                           //$NON-NLS-1$ //$NON-NLS-2$
+                  + "      " + sqlSumYearFieldSub + "," + NL //                        //$NON-NLS-1$ //$NON-NLS-2$
+                  + "      " + SQL_SUM_FIELDS + NL //$NON-NLS-1$
+
+                  + "   FROM " + TourDatabase.TABLE_TOUR_DATA + NL //                  //$NON-NLS-1$
+
+                  // get tag id's
+                  + "       " + tagFilterSqlJoinBuilder.getSqlTagJoinTable() //$NON-NLS-1$
+
+                  + "   AS jTdataTtag" + NL //$NON-NLS-1$
+                  + "   ON tourID = jTdataTtag.TourData_tourId" + NL //                //$NON-NLS-1$
+
+                  + "   WHERE " + sqlSumYearField + "=?" + NL //                       //$NON-NLS-1$ //$NON-NLS-2$
+                  + "      " + sqlAppFilter.getWhereClause() //$NON-NLS-1$
+
+                  + ") NecessaryNameOtherwiseItDoNotWork" + NL //                      //$NON-NLS-1$
+            ;
+
+         } else {
+
+            // without tag filter
+
+            sqlFromTourData = NL
+
+                  + "FROM " + TourDatabase.TABLE_TOUR_DATA + NL //                     //$NON-NLS-1$
+
+                  + "WHERE " + sqlSumYearField + "=?" + NL //                          //$NON-NLS-1$ //$NON-NLS-2$
+                  + "   " + sqlAppFilter.getWhereClause() + NL; //$NON-NLS-1$
+         }
+
+         sql = NL +
+
+               "SELECT" + NL //                                                        //$NON-NLS-1$
+
+               + sqlSumYearField + "," + NL //                                         //$NON-NLS-1$
+               + sqlSumYearFieldSub + "," + NL //                                      //$NON-NLS-1$
+               + SQL_SUM_COLUMNS
+
+               + sqlFromTourData
+
+               + "GROUP BY " + sqlSumYearField + "," + sqlSumYearFieldSub + NL //      //$NON-NLS-1$ //$NON-NLS-2$
+               + "ORDER BY " + sqlSumYearFieldSub + NL //                              //$NON-NLS-1$
          ;
 
-      } else {
-
-         // without tag filter
-
-         fromTourData = NL
-
-               + " FROM " + TourDatabase.TABLE_TOUR_DATA + NL //$NON-NLS-1$
-
-               + " WHERE " + sumYearField + "=?" + NL //$NON-NLS-1$ //$NON-NLS-2$
-               + sqlFilter.getWhereClause() + NL;
-      }
-
-      final String sql = NL +
-
-            "SELECT                       " + NL //$NON-NLS-1$
-
-            + sumYearField + ",         " + NL //$NON-NLS-1$
-            + sumYearFieldSub + ",      " + NL //$NON-NLS-1$
-            + SQL_SUM_COLUMNS
-
-            + fromTourData
-
-            + " GROUP BY " + sumYearField + "," + sumYearFieldSub + NL //      //$NON-NLS-1$ //$NON-NLS-2$
-            + " ORDER BY " + sumYearFieldSub + NL //                  //$NON-NLS-1$
-      ;
-      try {
-
-         final ZonedDateTime tourWeek = calendar8.with(//
+         final ZonedDateTime tourWeek = calendar8.with(
                TimeTools.calendarWeek.dayOfWeek(),
                TimeTools.calendarWeek.getFirstDayOfWeek().getValue());
 
-         final Connection conn = TourDatabase.getInstance().getConnection();
-         final PreparedStatement statement = conn.prepareStatement(sql);
+         final PreparedStatement prepStmt = conn.prepareStatement(sql);
+
+         int paramIndex = 1;
+
+         paramIndex = tagFilterSqlJoinBuilder.setParameters(prepStmt, paramIndex);
 
          // set sql parameters
-         statement.setInt(1, tourYear);
-         sqlFilter.setParameters(statement, 2);
+         prepStmt.setInt(paramIndex++, tourYear);
+         sqlAppFilter.setParameters(prepStmt, paramIndex++);
 
-         final ResultSet result = statement.executeQuery();
+         final ResultSet result = prepStmt.executeQuery();
          while (result.next()) {
 
-            final TVITourBookItem tourItem = new TVITourBookYearSub(tourBookView, this, _subCategory);
+            final TVITourBookItem tourItem = new TVITourBookYearCategorized(tourBookView, this, _subCategory);
 
             children.add(tourItem);
 
@@ -155,7 +171,7 @@ public class TVITourBookYear extends TVITourBookItem {
 
             /*
              * Fixed "java.time.LocalDate cannot be cast to java.time.ZonedDateTime" exception with
-             * this special date/time contruction
+             * this special date/time construction
              */
             LocalDate categoryDate;
             final LocalDate tourWeekLocal = tourWeek.toLocalDate();
@@ -166,9 +182,8 @@ public class TVITourBookYear extends TVITourBookItem {
 
                final TemporalField weekBasedYear = TimeTools.calendarWeek.weekBasedYear();
                final TemporalField weekOfYear = TimeTools.calendarWeek.weekOfYear();
-//               final TemporalField weekOfYear = TimeTools.calendarWeek.weekOfWeekBasedYear();
 
-               categoryDate = tourWeekLocal//
+               categoryDate = tourWeekLocal
                      .with(weekBasedYear, dbYear)
                      .with(weekOfYear, dbYearSub);
 
@@ -181,7 +196,7 @@ public class TVITourBookYear extends TVITourBookItem {
 
                // month
 
-               categoryDate = tourWeekLocal//
+               categoryDate = tourWeekLocal
                      .withYear(dbYear)
                      .withMonth(dbYearSub);
 
@@ -200,10 +215,8 @@ public class TVITourBookYear extends TVITourBookItem {
             tourItem.addSumColumns(result, 3);
          }
 
-         conn.close();
-
       } catch (final SQLException e) {
-         net.tourbook.ui.UI.showSQLException(e);
+         SQL.showException(e, sql);
       }
    }
 

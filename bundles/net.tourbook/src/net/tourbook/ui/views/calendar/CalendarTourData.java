@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2011-2019 Matthias Helmling and Contributors
+ * Copyright (C) 2011, 2020 Matthias Helmling and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -43,10 +43,13 @@ public class CalendarTourData {
    int             cadenceZone_SlowTime;
    int             cadenceZone_FastTime;
 
-   int             recordingTime;
-   int             drivingTime;
+   int             elapsedTime;
+   int             recordedTime;
+   int             movingTime;
 
    int             calories;
+   float           power_Avg;
+   float           pulse_Avg;
 
    String          tourTitle;
    String          tourDescription;

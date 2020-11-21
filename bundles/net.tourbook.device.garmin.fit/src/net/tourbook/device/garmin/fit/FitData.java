@@ -77,20 +77,22 @@ public class FitData {
    private String                  _sessionIndex;
    private ZonedDateTime           _sessionStartTime;
 
-   private String                  _sportName = UI.EMPTY_STRING;
-   private String                  _profileName = UI.EMPTY_STRING;
+   private String                  _sportName            = UI.EMPTY_STRING;
+   private String                  _profileName          = UI.EMPTY_STRING;
 
    private final List<TimeData>    _allTimeData          = new ArrayList<>();
 
    private final List<GearData>    _allGearData          = new ArrayList<>();
    private final List<SwimData>    _allSwimData          = new ArrayList<>();
    private final List<TourMarker>  _allTourMarker        = new ArrayList<>();
+   private List<Long>              _pausedTime_Start     = new ArrayList<>();
+   private final List<Long>        _pausedTime_End       = new ArrayList<>();
 
    private TimeData                _current_TimeData;
+
    private TimeData                _previous_TimeData;
 
    private TourMarker              _current_TourMarker;
-
    private long                    _timeDiffMS;
 
    public FitData(final FitDataReader fitDataReader,
@@ -140,7 +142,8 @@ public class FitData {
             final TourType newTourType = new TourType(parsedTourTypeLabel);
 
             final TourTypeColorDefinition newColorDefinition = new TourTypeColorDefinition(newTourType,
-                    Long.toString(newTourType.getTypeId()), newTourType.getName());
+                  Long.toString(newTourType.getTypeId()),
+                  newTourType.getName());
 
             newTourType.setColorBright(newColorDefinition.getGradientBright_Default());
             newTourType.setColorDark(newColorDefinition.getGradientDark_Default());
@@ -151,19 +154,19 @@ public class FitData {
             newSavedTourType = TourDatabase.saveEntity(newTourType, newTourType.getTypeId(), TourType.class);
             if (newSavedTourType != null) {
 
-                tourType = newSavedTourType;
+               tourType = newSavedTourType;
 
-                TourDatabase.clearTourTypes();
-                TourManager.getInstance().clearTourDataCache();
+               TourDatabase.clearTourTypes();
+               TourManager.getInstance().clearTourDataCache();
 
-                // Update Tour Type (Filter) list UI
-                Display.getDefault().syncExec(new Runnable() {
-                   @Override
+               // Update Tour Type (Filter) list UI
+               Display.getDefault().syncExec(new Runnable() {
+                  @Override
                   public void run() {
-                      // fire modify event
-                      TourbookPlugin.getPrefStore().setValue(ITourbookPreferences.TOUR_TYPE_LIST_IS_MODIFIED, Math.random());
-                   }
-                });
+                     // fire modify event
+                     TourbookPlugin.getPrefStore().setValue(ITourbookPreferences.TOUR_TYPE_LIST_IS_MODIFIED, Math.random());
+                  }
+               });
             }
          }
 
@@ -240,6 +243,14 @@ public class FitData {
 
       _tourData.createTimeSeries(_allTimeData, false);
 
+      _tourData.finalizeTour_TimerPauses(_pausedTime_Start, _pausedTime_End);
+      final long tourDeviceTimePaused = _tourData.getTourDeviceTime_Paused();
+      if (tourDeviceTimePaused > 0) {
+         //For the tours with pauses, we set the recorded time again as the elapsed time might have changed (+- few seconds)
+         //after the time series were created.
+         _tourData.setTourDeviceTime_Recorded(_tourData.getTourDeviceTime_Elapsed() - _tourData.getTourDeviceTime_Paused());
+      }
+
       // after all data are added, the tour id can be created
       final String uniqueId = _fitDataReader.createUniqueId(_tourData, Util.UNIQUE_ID_SUFFIX_GARMIN_FIT);
       final Long tourId = _tourData.createTourId(uniqueId);
@@ -285,7 +296,7 @@ public class FitData {
       }
 
       /*
-       * validate gear list
+       * Validate gear list
        */
       final long tourStartTime = tourData.getTourStartTimeMS();
       final long tourEndTime = tourStartTime + (timeSerie[timeSerie.length - 1] * 1000);
@@ -371,6 +382,10 @@ public class FitData {
       }
 
       final int[] timeSerie = tourData.timeSerie;
+      if (timeSerie == null || timeSerie.length == 0) {
+         return;
+      }
+
       final int serieSize = timeSerie.length;
 
       final long absoluteTourStartTime = tourData.getTourStartTimeMS();
@@ -428,7 +443,7 @@ public class FitData {
             if (isSetMarker) {
 
                /*
-                * a last marker can be set when it's far enough away from the end, this will disable
+                * A last marker can be set when it's far enough away from the end, this will disable
                 * the last tour marker
                 */
                final boolean canSetLastMarker = _isIgnoreLastMarker
@@ -460,43 +475,44 @@ public class FitData {
    }
 
    private void finalizeTour_Type(final TourData tourData) {
+
       // If enabled, set Tour Type using FIT file data
       if (_isFitImportTourType) {
 
          switch (_fitImportTourTypeMode) {
 
-            case IPreferences.FIT_IMPORT_TOURTYPE_MODE_SPORT:
+         case IPreferences.FIT_IMPORT_TOURTYPE_MODE_SPORT:
 
-               applyTour_Type(_tourData, _sportName);
-               break;
+            applyTour_Type(_tourData, _sportName);
+            break;
 
-            case IPreferences.FIT_IMPORT_TOURTYPE_MODE_PROFILE:
+         case IPreferences.FIT_IMPORT_TOURTYPE_MODE_PROFILE:
 
+            applyTour_Type(_tourData, _profileName);
+            break;
+
+         case IPreferences.FIT_IMPORT_TOURTYPE_MODE_TRYPROFILE:
+
+            if (!UI.EMPTY_STRING.equals(_profileName)) {
                applyTour_Type(_tourData, _profileName);
-               break;
+            } else {
+               applyTour_Type(_tourData, _sportName);
+            }
+            break;
 
-            case IPreferences.FIT_IMPORT_TOURTYPE_MODE_TRYPROFILE:
+         case IPreferences.FIT_IMPORT_TOURTYPE_MODE_SPORTANDPROFILE:
 
-               if (!UI.EMPTY_STRING.equals(_profileName)) {
-                  applyTour_Type(_tourData, _profileName);
-               } else {
-                  applyTour_Type(_tourData, _sportName);
-               }
-               break;
+            String spacerText = UI.EMPTY_STRING;
 
-            case IPreferences.FIT_IMPORT_TOURTYPE_MODE_SPORTANDPROFILE:
+            // Insert spacer character if Sport Name is present
+            if ((!UI.EMPTY_STRING.equals(_sportName)) && (!UI.EMPTY_STRING.equals(_profileName))) {
+               spacerText = UI.DASH_WITH_SPACE;
+            }
 
-               String spacerText = UI.EMPTY_STRING;
-
-               // Insert spacer character of Sport Name is present
-               if ((!UI.EMPTY_STRING.equals(_sportName)) && (!UI.EMPTY_STRING.equals(_profileName))) {
-                  spacerText = UI.DASH_WITH_SPACE;
-               }
-
-               applyTour_Type(_tourData, String.format("%s%s%s", _sportName, spacerText, _profileName));
-               break;
-        }
-     }
+            applyTour_Type(_tourData, _sportName + spacerText + _profileName);
+            break;
+         }
+      }
    }
 
    public List<TimeData> getAllTimeData() {
@@ -539,6 +555,14 @@ public class FitData {
 
    public List<GearData> getGearData() {
       return _allGearData;
+   }
+
+   public List<Long> getPausedTime_End() {
+      return _pausedTime_End;
+   }
+
+   public List<Long> getPausedTime_Start() {
+      return _pausedTime_Start;
    }
 
    public List<SwimData> getSwimData() {

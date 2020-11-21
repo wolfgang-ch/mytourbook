@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -1109,7 +1109,17 @@ public class UI {
 
                if (_fontForLogging != null) {
 
-                  _fontForLogging.dispose();
+                  /**
+                   * Delay old font disposal because org.eclipse.swt.custom.StyledTextRenderer is
+                   * using the old font in setFont(...) before the new font is initialized
+                   * -> realy bad behavior !!!
+                   */
+                  final Font oldFont = _fontForLogging;
+
+                  display.timerExec(10_000, () -> {
+                     oldFont.dispose();
+                  });
+
                   _fontForLogging = null;
                }
 
@@ -1321,11 +1331,10 @@ public class UI {
       final IPreferenceStore prefStore = TourbookPlugin.getDefault().getPreferenceStore();
 
       /*
-       * distance
+       * Distance
        */
       if (prefStore.getString(ITourbookPreferences.MEASUREMENT_SYSTEM_DISTANCE)
-            .equals(//
-                  ITourbookPreferences.MEASUREMENT_SYSTEM_DISTANCE_MI)) {
+            .equals(ITourbookPreferences.MEASUREMENT_SYSTEM_DISTANCE_MI)) {
 
          // set imperial measure system
 
@@ -1365,11 +1374,10 @@ public class UI {
       }
 
       /*
-       * altitude
+       * Elevation
        */
       if (prefStore.getString(ITourbookPreferences.MEASUREMENT_SYSTEM_ALTITUDE)
-            .equals(//
-                  ITourbookPreferences.MEASUREMENT_SYSTEM_ALTITUDE_FOOT)) {
+            .equals(ITourbookPreferences.MEASUREMENT_SYSTEM_ALTITUDE_FOOT)) {
 
          // set imperial measure system
 
@@ -1389,11 +1397,10 @@ public class UI {
       }
 
       /*
-       * temperature
+       * Temperature
        */
       if (prefStore.getString(ITourbookPreferences.MEASUREMENT_SYSTEM_TEMPERATURE)
-            .equals(//
-                  ITourbookPreferences.MEASUREMENT_SYSTEM_TEMPTERATURE_F)) {
+            .equals(ITourbookPreferences.MEASUREMENT_SYSTEM_TEMPTERATURE_F)) {
 
          // set imperial measure system
 
@@ -1413,11 +1420,10 @@ public class UI {
       }
 
       /*
-       * weight
+       * Weight
        */
       if (prefStore.getString(ITourbookPreferences.MEASUREMENT_SYSTEM_WEIGHT)
-            .equals(//
-                  ITourbookPreferences.MEASUREMENT_SYSTEM_WEIGHT_LBS)) {
+            .equals(ITourbookPreferences.MEASUREMENT_SYSTEM_WEIGHT_LBS)) {
 
          // set imperial measure system
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -23,9 +23,12 @@ import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.Random;
 
+import net.tourbook.common.util.Util;
 import net.tourbook.common.weather.IWeather;
 
 import org.eclipse.jface.action.Action;
+import org.eclipse.jface.action.IStatusLineManager;
+import org.eclipse.jface.action.StatusLineManager;
 import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.dialogs.IDialogSettings;
@@ -35,6 +38,7 @@ import org.eclipse.jface.preference.StringFieldEditor;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.resource.JFaceResources;
+import org.eclipse.jface.util.Geometry;
 import org.eclipse.jface.viewers.ColumnViewerEditor;
 import org.eclipse.jface.viewers.ColumnViewerEditorActivationEvent;
 import org.eclipse.jface.viewers.ColumnViewerEditorActivationStrategy;
@@ -82,7 +86,13 @@ import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Spinner;
 import org.eclipse.swt.widgets.ToolBar;
+import org.eclipse.swt.widgets.Widget;
+import org.eclipse.ui.IEditorSite;
 import org.eclipse.ui.IMemento;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchPart;
+import org.eclipse.ui.PlatformUI;
 import org.epics.css.dal.Timestamp;
 import org.epics.css.dal.Timestamp.Format;
 import org.joda.time.format.PeriodFormatter;
@@ -125,6 +135,7 @@ public class UI {
 
    public static final String       SYMBOL_ARROW_UP               = "\u2191";   //$NON-NLS-1$
    public static final String       SYMBOL_ARROW_DOWN             = "\u2193";   //$NON-NLS-1$
+   public static final String       SYMBOL_ARROW_RIGHT            = "\u2192";   //$NON-NLS-1$
    public static final String       SYMBOL_ARROW_LEFT_RIGHT       = "\u2194";   //$NON-NLS-1$
    public static final String       SYMBOL_ARROW_UP_DOWN          = "\u2195";   //$NON-NLS-1$
    public static final String       SYMBOL_AVERAGE                = "\u00f8";   //$NON-NLS-1$
@@ -155,17 +166,18 @@ public class UI {
 
    public static final CharSequence SYMBOL_BACKSLASH              = "\\";       //$NON-NLS-1$
    public static final String       SYMBOL_COLON                  = ":";        //$NON-NLS-1$
+   public static final String       SYMBOL_COMMA                  = ",";        //$NON-NLS-1$
    public static final String       SYMBOL_DOT                    = ".";        //$NON-NLS-1$
-   public static final String       SYMBOL_MIDDLE_DOT             = "·";        //$NON-NLS-1$
-   // this looks ugly "\u2551";
-   public static final String       SYMBOL_DOUBLE_VERTICAL        = "||";       //$NON-NLS-1$
+   public static final String       SYMBOL_DOUBLE_VERTICAL        = "||";       //$NON-NLS-1$   // this looks ugly "\u2551";
    public static final String       SYMBOL_EQUAL                  = "=";        //$NON-NLS-1$
    public static final String       SYMBOL_EXCLAMATION_POINT      = "!";        //$NON-NLS-1$
    public static final String       SYMBOL_GREATER_THAN           = ">";        //$NON-NLS-1$
    public static final String       SYMBOL_LESS_THAN              = "<";        //$NON-NLS-1$
+   public static final String       SYMBOL_MIDDLE_DOT             = "·";        //$NON-NLS-1$
    public static final String       SYMBOL_MNEMONIC               = "&";        //$NON-NLS-1$
    public static final String       SYMBOL_NUMBER_SIGN            = "#";        //$NON-NLS-1$
    public static final String       SYMBOL_PERCENTAGE             = "%";        //$NON-NLS-1$
+   public static final String       SYMBOL_PLUS                   = "+";        //$NON-NLS-1$
    public static final String       SYMBOL_QUESTION_MARK          = "?";        //$NON-NLS-1$
    public static final char         SYMBOL_SEMICOLON              = ';';
    public static final String       SYMBOL_STAR                   = "*";        //$NON-NLS-1$
@@ -213,15 +225,21 @@ public class UI {
 	public static final boolean			IS_WIN		= "win32".equals(SWT.getPlatform())		|| "wpf".equals(SWT.getPlatform());									//$NON-NLS-1$ //$NON-NLS-2$
 // SET_FORMATTING_ON
 
-   public static final String  BROWSER_TYPE_MOZILLA      = "mozilla";                //$NON-NLS-1$
+   /**
+    * On Linux an async selection event is fired since e4
+    */
+   public static final String  FIX_LINUX_ASYNC_EVENT_1   = "FIX_LINUX_ASYNC_EVENT_1"; //$NON-NLS-1$
+   public static final String  FIX_LINUX_ASYNC_EVENT_2   = "FIX_LINUX_ASYNC_EVENT_2";
 
-   public static final String  UTF_8                     = "UTF-8";                  //$NON-NLS-1$
-   public static final String  UTF_16                    = "UTF-16";                 //$NON-NLS-1$
-   public static final String  ISO_8859_1                = "ISO-8859-1";             //$NON-NLS-1$
+   public static final String  BROWSER_TYPE_MOZILLA      = "mozilla";                 //$NON-NLS-1$
 
-   public static final Charset UTF8_CHARSET              = Charset.forName("UTF-8"); //$NON-NLS-1$
+   public static final String  UTF_8                     = "UTF-8";                   //$NON-NLS-1$
+   public static final String  UTF_16                    = "UTF-16";                  //$NON-NLS-1$
+   public static final String  ISO_8859_1                = "ISO-8859-1";              //$NON-NLS-1$
 
-   public static final String  MENU_SEPARATOR_ADDITIONS  = "additions";              //$NON-NLS-1$
+   public static final Charset UTF8_CHARSET              = Charset.forName(UTF_8);
+
+   public static final String  MENU_SEPARATOR_ADDITIONS  = "additions";               //$NON-NLS-1$
 
    /**
     * Layout hint for a description field
@@ -296,6 +314,8 @@ public class UI {
    public static final String          UNIT_POWER_SHORT           = "W";                        //$NON-NLS-1$
    public static final String          UNIT_WEIGHT_KG             = "kg";                       //$NON-NLS-1$
    public static final String          UNIT_WEIGHT_LBS            = "lbs";                      //$NON-NLS-1$
+   public static final String          UNIT_HEIGHT_FT             = "ft";                       //$NON-NLS-1$
+   public static final String          UNIT_HEIGHT_IN             = "in";                       //$NON-NLS-1$
 
    public static final PeriodFormatter DEFAULT_DURATION_FORMATTER;
    public static final PeriodFormatter DEFAULT_DURATION_FORMATTER_SHORT;
@@ -388,6 +408,15 @@ public class UI {
    public static final int           DECORATOR_HORIZONTAL_INDENT = 2;
 
    static {
+
+      /**
+       * This creates a display which may contain also sleak options, otherwise sleak would not
+       * work.
+       * <p>
+       * Solution found here: "Sleak in RCP: Device is not tracking resource allocation"
+       * https://en.it1352.com/article/fb82e2d4ec294636ba29f786e3335066.html
+       */
+      PlatformUI.createDisplay();
 
       setupUI_FontMetrics();
 
@@ -497,18 +526,32 @@ public class UI {
    /**
     * Number of horizontal dialog units per character, value <code>4</code>.
     */
-   private static final int HORIZONTAL_DIALOG_UNIT_PER_CHAR = 4;
+   private static final int    HORIZONTAL_DIALOG_UNIT_PER_CHAR = 4;
 
    /**
     * Number of vertical dialog units per character, value <code>8</code>.
     */
 //	private static final int	VERTICAL_DIALOG_UNITS_PER_CHAR	= 8;
 
+   private static final String SYS_PROP__SCRAMBLE_DATA         = "scrambleData";                                     //$NON-NLS-1$
+
    /**
     * When <code>true</code> then data in the UI are scrambled. This is used to create anynonymous
     * screenshots.
+    * <p>
+    * Commandline parameter: <code>-DscrambleData</code>
     */
-   public static boolean IS_SCRAMBLE_DATA = System.getProperty("scrambleData") != null; //$NON-NLS-1$
+   public static boolean       IS_SCRAMBLE_DATA                = System.getProperty(SYS_PROP__SCRAMBLE_DATA) != null;
+
+   static {
+
+      if (IS_SCRAMBLE_DATA) {
+
+         Util.logSystemProperty_IsEnabled(UI.class,
+               SYS_PROP__SCRAMBLE_DATA,
+               "Visible data are scrambled"); //$NON-NLS-1$
+      }
+   }
 
    /**
     * @param sash
@@ -597,6 +640,23 @@ public class UI {
 
       final int oldValue = spinner.getSelection();
       spinner.setSelection(oldValue + valueAdjustment);
+   }
+
+   public static float convertBodyHeightFromMetric(final float height) {
+      if (UNIT_IS_METRIC) {
+         return height;
+      }
+
+      return height * UNIT_METER_TO_INCHES;
+   }
+
+   public static float convertBodyHeightToMetric(final float primaryHeight, final int subHeight) {
+
+      if (UNIT_IS_METRIC) {
+         return primaryHeight;
+      }
+
+      return 100 * (primaryHeight * 12 + subHeight) / UNIT_METER_TO_INCHES;
    }
 
    /**
@@ -865,6 +925,8 @@ public class UI {
    public static Composite createUI_PageNoData(final Composite parent, final String message) {
 
       final Composite pageNoData = new Composite(parent, SWT.NONE);
+      // use a dimmed color, default is white
+      pageNoData.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_BACKGROUND));
       GridDataFactory.fillDefaults().grab(true, true).applyTo(pageNoData);
       GridLayoutFactory.swtDefaults().numColumns(1).applyTo(pageNoData);
       {
@@ -932,20 +994,30 @@ public class UI {
 
       _formatterSB.setLength(0);
 
-      return _formatter.format(Messages.Format_hh, (time / 3600)).toString();
+      return _formatter.format(Messages.Format_hh,
+
+            time / 3600
+
+      ).toString();
    }
 
    public static String format_hh_mm(final long time) {
 
       _formatterSB.setLength(0);
 
-      return _formatter.format(Messages.Format_hhmm, (time / 3600), ((time % 3600) / 60)).toString();
+      return _formatter.format(Messages.Format_hhmm,
+
+            time / 3600,
+            time % 3600 / 60
+
+      ).toString();
    }
 
    /**
     * Hours are ignored when they are 0. An empty string is returned when time = <code>-1</code>
     *
     * @param time
+    *           ini seconds
     * @return
     */
    public static String format_hh_mm_ss(final long time) {
@@ -960,24 +1032,24 @@ public class UI {
 
          // display hours
 
-         return _formatter
-               .format(//
-                     Messages.Format_hhmmss,
-                     (time / 3600),
-                     ((time % 3600) / 60),
-                     ((time % 3600) % 60))
-               .toString();
+         return _formatter.format(Messages.Format_hhmmss,
+
+               time / 3600,
+               time % 3600 / 60,
+               time % 3600 % 60
+
+         ).toString();
 
       } else {
 
          // ignore hours
 
-         return _formatter
-               .format(
-                     Messages.Format_hhmm,
-                     ((time % 3600) / 60),
-                     ((time % 3600) % 60))
-               .toString();
+         return _formatter.format(Messages.Format_hhmm,
+
+               time % 3600 / 60,
+               time % 3600 % 60
+
+         ).toString();
       }
    }
 
@@ -985,18 +1057,17 @@ public class UI {
     * force hours to be displayed
     *
     * @param time
+    *           in seconds
     * @return
     */
    public static String format_hhh_mm_ss(final long time) {
 
       _formatterSB.setLength(0);
 
-      return _formatter
-            .format(
-                  Messages.Format_hhmmss,
-                  (time / 3600),
-                  ((time % 3600) / 60),
-                  ((time % 3600) % 60))
+      return _formatter.format(Messages.Format_hhmmss,
+            time / 3600,
+            (time % 3600) / 60,
+            (time % 3600) % 60)
             .toString();
    }
 
@@ -1010,7 +1081,12 @@ public class UI {
 
       final long timeAbs = time < 0 ? 0 - time : time;
 
-      return _formatter.format(Messages.Format_hhmm, (timeAbs / 60), (timeAbs % 60)).toString();
+      return _formatter.format(Messages.Format_hhmm,
+
+            timeAbs / 60,
+            timeAbs % 60
+
+      ).toString();
    }
 
    public static String format_yyyymmdd_hhmmss(final int year,
@@ -1022,16 +1098,16 @@ public class UI {
 
       _formatterSB.setLength(0);
 
-      return _formatter
-            .format(//
-                  Messages.Format_yyyymmdd_hhmmss,
-                  year,
-                  month,
-                  day,
-                  hour,
-                  minute,
-                  second)//
-            .toString();
+      return _formatter.format(Messages.Format_yyyymmdd_hhmmss,
+
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second
+
+      ).toString();
    }
 
    public static String FormatDoubleMinMax(final double value) {
@@ -1083,24 +1159,24 @@ public class UI {
 
          // display hours
 
-         timeText = _formatter
-               .format(//
-                     Messages.Format_hhmmss,
-                     (time / 3600),
-                     ((time % 3600) / 60),
-                     ((time % 3600) % 60))
-               .toString();
+         timeText = _formatter.format(Messages.Format_hhmmss,
+
+               time / 3600,
+               time % 3600 / 60,
+               time % 3600 % 60
+
+         ).toString();
 
       } else {
 
          // ignore hours
 
-         timeText = _formatter
-               .format(
-                     Messages.Format_hhmm,
-                     ((time % 3600) / 60),
-                     ((time % 3600) % 60))
-               .toString();
+         timeText = _formatter.format(Messages.Format_hhmm,
+
+               time % 3600 / 60,
+               time % 3600 % 60
+
+         ).toString();
 
       }
 
@@ -1252,6 +1328,37 @@ public class UI {
       return LINK_TAG_START + url + LINK_TAG_END;
    }
 
+   /**
+    * @return Returns the {@link StatusLineManager} of the current active part or <code>null</code>
+    *         when not available.
+    */
+   public static IStatusLineManager getStatusLineManager() {
+
+      final IWorkbenchPage activePage = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+
+      final IWorkbenchPart activePart = activePage.getActivePart();
+      if (activePart instanceof IViewPart) {
+
+         final IViewPart viewPart = (IViewPart) activePart;
+
+         return viewPart.getViewSite().getActionBars().getStatusLineManager();
+      }
+
+      final IWorkbenchPart activeEditor = activePage.getActiveEditor();
+      if (activeEditor instanceof IEditorSite) {
+
+         final IEditorSite editorSite = (IEditorSite) activeEditor;
+
+         return editorSite.getActionBars().getStatusLineManager();
+      }
+
+      return null;
+   }
+
+   /**
+    * @param event
+    * @return Returns <code>true</code> when <Ctrl> key is pressed.
+    */
    public static boolean isCtrlKey(final Event event) {
 
       boolean isCtrlKey;
@@ -1278,6 +1385,24 @@ public class UI {
       return isCtrlKey;
    }
 
+   public static boolean isLinuxAsyncEvent(final Widget widget) {
+
+      if (IS_LINUX) {
+
+         if (widget.getData(FIX_LINUX_ASYNC_EVENT_1) != null) {
+            widget.setData(FIX_LINUX_ASYNC_EVENT_1, null);
+            return true;
+         }
+
+         if (widget.getData(FIX_LINUX_ASYNC_EVENT_2) != null) {
+            widget.setData(FIX_LINUX_ASYNC_EVENT_2, null);
+            return true;
+         }
+      }
+
+      return false;
+   }
+
    public static boolean isShiftKey(final MouseEvent event) {
 
       boolean isShiftKey;
@@ -1302,7 +1427,78 @@ public class UI {
    }
 
    /**
-    * Opens the control context menu, the menu is aligned below the control to the right side
+    * Copied from {@link org.eclipse.ui.internal.handlers.ContextMenuHandler} and adjusted.
+    *
+    * @param control
+    */
+   @SuppressWarnings("restriction")
+   public static void openContextMenu(final Control control) {
+
+      if (control == null || control.isDisposed()) {
+         return;
+      }
+
+      final Shell shell = control.getShell();
+      final Display display = shell == null ? Display.getCurrent() : shell.getDisplay();
+
+      final Point cursorLocation = display.getCursorLocation();
+
+      final Event event = new Event();
+      event.x = cursorLocation.x;
+      event.y = cursorLocation.y;
+      event.detail = SWT.MENU_MOUSE;
+
+      control.notifyListeners(SWT.MenuDetect, event);
+
+      if (!event.doit) {
+         return;
+      }
+
+      final Menu menu = control.getMenu();
+
+      if (menu != null && !menu.isDisposed()) {
+
+         if (event.x != cursorLocation.x || event.y != cursorLocation.y) {
+            menu.setLocation(event.x, event.y);
+         }
+         menu.setVisible(true);
+
+      } else {
+
+         final Point size = control.getSize();
+         final Point location = control.toDisplay(0, 0);
+
+         final Event mouseEvent = new Event();
+         mouseEvent.widget = control;
+
+         if (event.x < location.x
+               || location.x + size.x <= event.x
+               || event.y < location.y
+               || location.y + size.y <= event.y) {
+
+            final Point center = control.toDisplay(Geometry.divide(size, 2));
+            mouseEvent.x = center.x;
+            mouseEvent.y = center.y;
+            mouseEvent.type = SWT.MouseMove;
+            display.post(mouseEvent);
+
+         } else {
+
+            mouseEvent.x = event.x;
+            mouseEvent.y = event.y;
+         }
+
+         mouseEvent.button = 2;
+         mouseEvent.type = SWT.MouseDown;
+         display.post(mouseEvent);
+
+         mouseEvent.type = SWT.MouseUp;
+         display.post(mouseEvent);
+      }
+   }
+
+   /**
+    * Opens the control context menu, the menue is aligned below the control to the right side
     *
     * @param control
     *           Controls which menu is opened

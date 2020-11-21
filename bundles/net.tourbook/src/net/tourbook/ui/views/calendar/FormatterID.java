@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -23,7 +23,7 @@ public enum FormatterID {
    TOUR_DESCRIPTION, //
 
    DISTANCE, //
-   ALTITUDE, //
+   ELEVATION, //
    ELEVATION_CHANGE, //
 
    CADENCE_ZONES_TIMES, //
@@ -31,11 +31,16 @@ public enum FormatterID {
    SPEED, //
    PACE, //
 
+   POWER_AVG, //
+   PULSE_AVG, //
+
    ENERGY_KCAL, //
    ENERGY_MJ, //
 
-   TIME_MOVING, //
-   TIME_RECORDING, //
+   TIME_ELAPSED, //
+   TIME_RECORDED, //
    TIME_PAUSED, //
+   TIME_MOVING, //
+   TIME_BREAK, //
 
 }

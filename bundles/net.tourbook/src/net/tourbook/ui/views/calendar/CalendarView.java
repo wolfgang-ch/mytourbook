@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2018 Matthias Helmling and Contributors
+ * Copyright (C) 2011, 2020 Matthias Helmling and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -17,6 +17,27 @@ package net.tourbook.ui.views.calendar;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+
+import net.tourbook.Messages;
+import net.tourbook.application.TourbookPlugin;
+import net.tourbook.common.UI;
+import net.tourbook.common.color.ColorDefinition;
+import net.tourbook.common.color.GraphColorManager;
+import net.tourbook.common.font.MTFont;
+import net.tourbook.common.preferences.ICommonPreferences;
+import net.tourbook.common.time.TimeTools;
+import net.tourbook.common.tooltip.IOpeningDialog;
+import net.tourbook.common.tooltip.OpenDialogManager;
+import net.tourbook.common.util.Util;
+import net.tourbook.data.TourData;
+import net.tourbook.preferences.ITourbookPreferences;
+import net.tourbook.tour.ITourEventListener;
+import net.tourbook.tour.SelectionDeletedTours;
+import net.tourbook.tour.SelectionTourId;
+import net.tourbook.tour.TourEventId;
+import net.tourbook.tour.TourManager;
+import net.tourbook.ui.ITourProvider;
+import net.tourbook.ui.views.calendar.CalendarProfileManager.ICalendarProfileListener;
 
 import org.eclipse.e4.ui.di.PersistState;
 import org.eclipse.jface.action.Action;
@@ -48,739 +69,709 @@ import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchPartReference;
 import org.eclipse.ui.part.ViewPart;
 
-import net.tourbook.Messages;
-import net.tourbook.application.TourbookPlugin;
-import net.tourbook.common.UI;
-import net.tourbook.common.color.ColorDefinition;
-import net.tourbook.common.color.GraphColorManager;
-import net.tourbook.common.font.MTFont;
-import net.tourbook.common.preferences.ICommonPreferences;
-import net.tourbook.common.time.TimeTools;
-import net.tourbook.common.tooltip.IOpeningDialog;
-import net.tourbook.common.tooltip.OpenDialogManager;
-import net.tourbook.common.util.Util;
-import net.tourbook.data.TourData;
-import net.tourbook.preferences.ITourbookPreferences;
-import net.tourbook.tour.ITourEventListener;
-import net.tourbook.tour.SelectionDeletedTours;
-import net.tourbook.tour.SelectionTourId;
-import net.tourbook.tour.TourEventId;
-import net.tourbook.tour.TourManager;
-import net.tourbook.ui.ITourProvider;
-import net.tourbook.ui.views.calendar.CalendarProfileManager.ICalendarProfileListener;
-
 public class CalendarView extends ViewPart implements ITourProvider, ICalendarProfileListener {
 
-// SET_FORMATTING_OFF
+   /**
+    * The ID of the view as specified by the extension.
+    */
+   public static final String      ID                              = "net.tourbook.views.calendar.CalendarView";                //$NON-NLS-1$
 
-	/**
-	 * The ID of the view as specified by the extension.
-	 */
-	public static final String		ID												= "net.tourbook.views.calendar.CalendarView";	//$NON-NLS-1$
+   private static final String     STATE_IS_LINKED                 = "STATE_IS_LINKED";                                         //$NON-NLS-1$
+   private static final String     STATE_IS_SHOW_TOUR_INFO         = "STATE_IS_SHOW_TOUR_INFO";                                 //$NON-NLS-1$
+   static final String             STATE_TOUR_TOOLTIP_DELAY        = "STATE_TOUR_TOOLTIP_DELAY";                                //$NON-NLS-1$
 
-	private static final String	STATE_IS_LINKED							= "STATE_IS_LINKED"; 									//$NON-NLS-1$
-	private static final String	STATE_IS_SHOW_TOUR_INFO					= "STATE_IS_SHOW_TOUR_INFO";	 						//$NON-NLS-1$
-	static final String 				STATE_TOUR_TOOLTIP_DELAY	 			= "STATE_TOUR_TOOLTIP_DELAY"; 						//$NON-NLS-1$
+   private static final String     STATE_FIRST_DISPLAYED_EPOCH_DAY = "STATE_FIRST_DISPLAYED_EPOCH_DAY";                         //$NON-NLS-1$
+   private static final String     STATE_SELECTED_TOURS            = "STATE_SELECTED_TOURS";                                    //$NON-NLS-1$
 
-	private static final String	STATE_FIRST_DISPLAYED_EPOCH_DAY		= "STATE_FIRST_DISPLAYED_EPOCH_DAY";				//$NON-NLS-1$
-	private static final String	STATE_SELECTED_TOURS						= "STATE_SELECTED_TOURS";								//$NON-NLS-1$
+   static final int                DEFAULT_TOUR_TOOLTIP_DELAY      = 100;                                                       // ms
 
-	static final int					DEFAULT_TOUR_TOOLTIP_DELAY				= 100; // ms
+   private final IPreferenceStore  _prefStore                      = TourbookPlugin.getPrefStore();
+   private final IDialogSettings   _state                          = TourbookPlugin.getState("TourCalendarView");               //$NON-NLS-1$
 
-	private final IPreferenceStore	_prefStore								= TourbookPlugin.getPrefStore();
-	private final IDialogSettings		_state									= TourbookPlugin.getState("TourCalendarView");	//$NON-NLS-1$
-	private boolean						_stateIsLinked;
-	private boolean						_stateIsShowTourInfo;
+   private boolean                 _stateIsLinked;
+   private boolean                 _stateIsShowTourInfo;
 
-	ColorDefinition[]						_allColorDefinition					= GraphColorManager.getInstance().getGraphColorDefinitions();
+   ColorDefinition[]               _allColorDefinition             = GraphColorManager.getInstance().getGraphColorDefinitions();
 
-// SET_FORMATTING_ON
+   private ISelectionListener      _selectionListener;
+   private IPartListener2          _partListener;
+   private IPropertyChangeListener _prefChangeListener;
+   private ITourEventListener      _tourEventListener;
 
-	//
-	private ISelectionListener			_selectionListener;
-	private IPartListener2				_partListener;
-	private IPropertyChangeListener	_prefChangeListener;
-	private ITourEventListener			_tourEventListener;
+   private ActionCalendarOptions   _actionCalendarOptions;
 
-	private ActionCalendarOptions		_actionCalendarOptions;
+   private Action                  _actionBack;
+   private Action                  _actionForward;
+   private Action                  _actionSetLinked;
+   private Action                  _actionGotoToday;
+   private ActionTourInfo          _actionTourInfo;
 
-	private Action							_actionBack;
-	private Action							_actionForward;
-	private Action							_actionSetLinked;
-	private Action							_actionGotoToday;
-	private ActionTourInfo				_actionTourInfo;
-	//
-	private LocalDate						_titleFirstDay;
-	private LocalDate						_titleLastDay;
+   private LocalDate               _titleFirstDay;
+   private LocalDate               _titleLastDay;
 
-	private PixelConverter				_pc;
+   private PixelConverter          _pc;
 
-	private CalendarTourInfoToolTip	_tourInfoToolTip;
-	private OpenDialogManager			_openDlgMgr								= new OpenDialogManager();
+   private CalendarTourInfoToolTip _tourInfoToolTip;
+   private OpenDialogManager       _openDlgMgr                     = new OpenDialogManager();
 
-	/*
-	 * UI controls
-	 */
-	private CalendarGraph				_calendarGraph;
+   /*
+    * UI controls
+    */
+   private CalendarGraph _calendarGraph;
 
-	private Composite						_parent;
-	private Composite						_calendarContainer;
+   private Composite     _parent;
+   private Composite     _calendarContainer;
 
-	private Combo							_comboProfiles;
+   private Combo         _comboProfiles;
 
-	private Label							_lblTitle;
+   private Label         _lblTitle;
 
-	public CalendarView() {}
+   public CalendarView() {}
 
-	private void addPartListener() {
+   private void addPartListener() {
 
-		_partListener = new IPartListener2() {
-			@Override
-			public void partActivated(final IWorkbenchPartReference partRef) {}
+      _partListener = new IPartListener2() {
+         @Override
+         public void partActivated(final IWorkbenchPartReference partRef) {}
 
-			@Override
-			public void partBroughtToTop(final IWorkbenchPartReference partRef) {}
+         @Override
+         public void partBroughtToTop(final IWorkbenchPartReference partRef) {}
 
-			@Override
-			public void partClosed(final IWorkbenchPartReference partRef) {
+         @Override
+         public void partClosed(final IWorkbenchPartReference partRef) {
 
-				if (partRef.getPart(false) == CalendarView.this) {
-					CalendarProfileManager.removeProfileListener(CalendarView.this);
-				}
-			}
+            if (partRef.getPart(false) == CalendarView.this) {
+               CalendarProfileManager.removeProfileListener(CalendarView.this);
+            }
+         }
 
-			@Override
-			public void partDeactivated(final IWorkbenchPartReference partRef) {}
+         @Override
+         public void partDeactivated(final IWorkbenchPartReference partRef) {}
 
-			@Override
-			public void partHidden(final IWorkbenchPartReference partRef) {
+         @Override
+         public void partHidden(final IWorkbenchPartReference partRef) {
 
-				if (partRef.getPart(false) == CalendarView.this) {
-					onPartHidden();
-				}
-			}
+            if (partRef.getPart(false) == CalendarView.this) {
+               onPartHidden();
+            }
+         }
 
-			@Override
-			public void partInputChanged(final IWorkbenchPartReference partRef) {}
+         @Override
+         public void partInputChanged(final IWorkbenchPartReference partRef) {}
 
-			@Override
-			public void partOpened(final IWorkbenchPartReference partRef) {
+         @Override
+         public void partOpened(final IWorkbenchPartReference partRef) {
 
-				if (partRef.getPart(false) == CalendarView.this) {
-					CalendarProfileManager.addProfileListener(CalendarView.this);
-				}
-			}
+            if (partRef.getPart(false) == CalendarView.this) {
+               CalendarProfileManager.addProfileListener(CalendarView.this);
+            }
+         }
 
-			@Override
-			public void partVisible(final IWorkbenchPartReference partRef) {}
-		};
-		getViewSite().getPage().addPartListener(_partListener);
-	}
+         @Override
+         public void partVisible(final IWorkbenchPartReference partRef) {}
+      };
+      getViewSite().getPage().addPartListener(_partListener);
+   }
 
-	private void addPrefListener() {
+   private void addPrefListener() {
 
-		_prefChangeListener = new IPropertyChangeListener() {
+      _prefChangeListener = new IPropertyChangeListener() {
 
-			@Override
-			public void propertyChange(final PropertyChangeEvent event) {
+         @Override
+         public void propertyChange(final PropertyChangeEvent event) {
 
-				final String property = event.getProperty();
+            final String property = event.getProperty();
 
-				if (property.equals(ITourbookPreferences.APP_DATA_FILTER_IS_MODIFIED)
-						|| property.equals(ICommonPreferences.CALENDAR_WEEK_FIRST_DAY_OF_WEEK)
-						|| property.equals(ICommonPreferences.CALENDAR_WEEK_MIN_DAYS_IN_FIRST_WEEK)) {
+            if (property.equals(ITourbookPreferences.APP_DATA_FILTER_IS_MODIFIED)
+                  || property.equals(ICommonPreferences.CALENDAR_WEEK_FIRST_DAY_OF_WEEK)
+                  || property.equals(ICommonPreferences.CALENDAR_WEEK_MIN_DAYS_IN_FIRST_WEEK)) {
 
-					refreshCalendar();
+               refreshCalendar();
 
-				} else if (property.equals(ITourbookPreferences.TOUR_TYPE_LIST_IS_MODIFIED)) {
+            } else if (property.equals(ITourbookPreferences.TOUR_TYPE_LIST_IS_MODIFIED)) {
 
-					_calendarGraph.updateTourTypeColors();
+               _calendarGraph.updateTourTypeColors();
 
-					refreshCalendar();
-				}
-			}
+               refreshCalendar();
+            }
+         }
 
-		};
+      };
 
-		// add prop listener
-		_prefStore.addPropertyChangeListener(_prefChangeListener);
+      // add prop listener
+      _prefStore.addPropertyChangeListener(_prefChangeListener);
 
-	}
+   }
 
-	// create and register our selection listener
-	private void addSelectionListener() {
+   // create and register our selection listener
+   private void addSelectionListener() {
 
-		_selectionListener = new ISelectionListener() {
+      _selectionListener = new ISelectionListener() {
 
-			@Override
-			public void selectionChanged(final IWorkbenchPart part, final ISelection selection) {
+         @Override
+         public void selectionChanged(final IWorkbenchPart part, final ISelection selection) {
 
-				// prevent to listen to a selection which is originated by this year chart
-				if (part == CalendarView.this) {
-					return;
-				}
-
-				onSelectionChanged(selection);
-
-			}
-		};
-
-		// register selection listener in the page
-		getSite().getPage().addPostSelectionListener(_selectionListener);
-	}
-
-	private void addTourEventListener() {
-
-		_tourEventListener = new ITourEventListener() {
-			@Override
-			public void tourChanged(final IWorkbenchPart part, final TourEventId eventId, final Object eventData) {
-
-				if (CalendarView.this == part) {
-					// skip own events
-					return;
-				}
-
-				if (eventId == TourEventId.TOUR_CHANGED || eventId == TourEventId.UPDATE_UI) {
-					/*
-					 * it is possible when a tour type was modified, the tour can be hidden or visible in
-					 * the viewer because of the tour type filter
-					 */
-					refreshCalendar();
-
-				} else if ((eventId == TourEventId.TOUR_SELECTION //
-						|| eventId == TourEventId.SLIDER_POSITION_CHANGED)
-
-						&& eventData instanceof ISelection) {
-
-					onSelectionChanged((ISelection) eventData);
-
-				} else if (eventId == TourEventId.TAG_STRUCTURE_CHANGED
-						|| eventId == TourEventId.ALL_TOURS_ARE_MODIFIED) {
-
-					refreshCalendar();
-				}
-			}
-		};
-
-		TourManager.getInstance().addTourEventListener(_tourEventListener);
-	}
-
-	/**
-	 * Close all opened dialogs except the opening dialog.
-	 *
-	 * @param openingDialog
-	 */
-	void closeOpenedDialogs(final IOpeningDialog openingDialog) {
-
-		_openDlgMgr.closeOpenedDialogs(openingDialog);
-	}
-
-	private void createActions() {
-
-		_actionCalendarOptions = new ActionCalendarOptions(this);
-		_actionTourInfo = new ActionTourInfo(this, _parent);
+            // prevent to listen to a selection which is originated by this year chart
+            if (part == CalendarView.this) {
+               return;
+            }
 
-		/*
-		 * Back
-		 */
-		{
-			_actionBack = new Action() {
-				@Override
-				public void run() {
-					_calendarGraph.scroll_WithWheel_Screen(1);
-				}
-			};
-			_actionBack.setText(Messages.Calendar_View_Action_Back);
-			_actionBack.setToolTipText(Messages.Calendar_View_Action_Back_Tooltip);
-			_actionBack.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__ArrowUp));
-		}
-
-		/*
-		 * Forward
-		 */
-		{
-			_actionForward = new Action() {
-				@Override
-				public void run() {
-					_calendarGraph.scroll_WithWheel_Screen(-1);
-				}
-			};
-			_actionForward.setText(Messages.Calendar_View_Action_Forward);
-			_actionForward.setToolTipText(Messages.Calendar_View_Action_Forward_Tooltip);
-			_actionForward.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__ArrowDown));
-		}
-
-		/*
-		 * Link with other views
-		 */
-		{
-			_actionSetLinked = new Action(null, Action.AS_CHECK_BOX) {
-				@Override
-				public void run() {
-					_calendarGraph.setLinked(_stateIsLinked);
-				}
-			};
-			_actionSetLinked.setText(Messages.Calendar_View_Action_LinkWithOtherViews);
-			_actionSetLinked.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__SyncViews));
-			_actionSetLinked.setChecked(true);
-		}
-
-		/*
-		 * Today
-		 */
-		{
-			_actionGotoToday = new Action() {
-				@Override
-				public void run() {
-					_calendarGraph.gotoDate_Today();
-				}
-			};
-			_actionGotoToday.setText(Messages.Calendar_View_Action_GotoToday);
-			_actionGotoToday.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__ZoomCentered));
-		}
-	}
-
-	@Override
-	public void createPartControl(final Composite parent) {
-
-		_parent = parent;
-
-		addPartListener();
-		addPrefListener();
-		addTourEventListener();
-
-		initUI(parent);
-
-		createUI(parent);
-
-		createActions();
-		fillActions();
-
-		addSelectionListener();
-
-		// set context menu
-		final Menu contextMenu = (new TourContextMenu()).createContextMenu(this, _calendarGraph, getLocalActions());
-		_calendarGraph.setMenu(contextMenu);
-
-		// set tour tooltip
-		_tourInfoToolTip = new CalendarTourInfoToolTip(this);
-
-		restoreState();
-
-		profileIsModified();
-
-		// restore selection
-		onSelectionChanged(getSite().getWorkbenchWindow().getSelectionService().getSelection());
-	}
-
-	private void createUI(final Composite parent) {
-
-		parent.addControlListener(new ControlAdapter() {
-
-			@Override
-			public void controlResized(final ControlEvent e) {
-				updateUI_Title(null, null);
-			}
-		});
-
-		final Composite container = new Composite(parent, SWT.NONE);
-		GridLayoutFactory
-				.fillDefaults()//
-				.numColumns(1)
-				.spacing(0, 0)
-				.applyTo(container);
-		{
-			createUI_10_Header(container);
-
-			// create composite with vertical scrollbars
-			_calendarContainer = new Composite(container, SWT.NO_BACKGROUND | SWT.V_SCROLL);
-			GridDataFactory.fillDefaults().grab(true, true).applyTo(_calendarContainer);
-			GridLayoutFactory.fillDefaults().spacing(0, 0).margins(0, 0).numColumns(1).applyTo(_calendarContainer);
-			{
-				_calendarGraph = new CalendarGraph(_calendarContainer, SWT.NO_BACKGROUND, this);
-				GridDataFactory.fillDefaults().grab(true, true).applyTo(_calendarGraph);
-			}
-		}
-	}
-
-	private void createUI_10_Header(final Composite parent) {
-
-		final Composite container = new Composite(parent, SWT.NONE);
-		GridDataFactory.fillDefaults().grab(true, false).applyTo(container);
-		GridLayoutFactory.swtDefaults().numColumns(2).applyTo(container);
-//		container.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_RED));
-		{
-			{
-				/*
-				 * Title
-				 */
-				_lblTitle = new Label(container, SWT.NONE);
-				GridDataFactory
-						.fillDefaults()//
-						.grab(true, false)
-						.align(SWT.FILL, SWT.CENTER)
-						.applyTo(_lblTitle);
-				MTFont.setHeaderFont(_lblTitle);
-//				_lblTitle.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
-			}
-			{
-				/*
-				 * Combo: Profiles
-				 */
-				_comboProfiles = new Combo(container, SWT.READ_ONLY | SWT.BORDER);
-				_comboProfiles.setVisibleItemCount(30);
-				_comboProfiles.addSelectionListener(new SelectionAdapter() {
-					@Override
-					public void widgetSelected(final SelectionEvent e) {
-						onSelectProfile();
-					}
-				});
-				GridDataFactory
-						.fillDefaults()
-						.align(SWT.BEGINNING, SWT.CENTER)
-						.hint(_pc.convertWidthInCharsToPixels(40), SWT.DEFAULT)
-						.applyTo(_comboProfiles);
-			}
-		}
-	}
-
-	@Override
-	public void dispose() {
-
-		TourManager.getInstance().removeTourEventListener(_tourEventListener);
-		getSite().getPage().removePostSelectionListener(_selectionListener);
-		_prefStore.removePropertyChangeListener(_prefChangeListener);
-
-		super.dispose();
-	}
-
-	private void fillActions() {
-
-		final IActionBars bars = getViewSite().getActionBars();
-
-		final IToolBarManager toolbarMrg = bars.getToolBarManager();
-
-		/*
-		 * Toolbar
-		 */
-		final CalendarYearMonthContributionItem yearMonthItem = new CalendarYearMonthContributionItem(_calendarGraph);
-		_calendarGraph.setYearMonthContributor(yearMonthItem);
-
-		toolbarMrg.add(yearMonthItem);
-
-		toolbarMrg.add(_actionSetLinked);
-		toolbarMrg.add(_actionTourInfo);
-		toolbarMrg.add(_actionCalendarOptions);
-	}
-
-	void fillUI_Profiles() {
-
-		// 1. get the profiles
-		final ArrayList<CalendarProfile> allCalendarProfiles = CalendarProfileManager.getAllCalendarProfiles();
-
-		// 2. get active profile
-		final CalendarProfile activeProfile = CalendarProfileManager.getActiveCalendarProfile();
-
-		_comboProfiles.removeAll();
-
-		int selectIndex = 0;
-
-		for (int profileIndex = 0; profileIndex < allCalendarProfiles.size(); profileIndex++) {
-
-			final CalendarProfile profile = allCalendarProfiles.get(profileIndex);
-
-			_comboProfiles.add(CalendarProfileManager.getProfileName(profile, profile.profileName));
-
-			// get index for active profile
-			if (activeProfile.equals(profile)) {
-				selectIndex = profileIndex;
-			}
-		}
-
-		_comboProfiles.select(selectIndex);
-	}
+            onSelectionChanged(selection);
+
+         }
+      };
+
+      // register selection listener in the page
+      getSite().getPage().addPostSelectionListener(_selectionListener);
+   }
+
+   private void addTourEventListener() {
+
+      _tourEventListener = new ITourEventListener() {
+         @Override
+         public void tourChanged(final IWorkbenchPart part, final TourEventId eventId, final Object eventData) {
+
+            if (CalendarView.this == part) {
+               // skip own events
+               return;
+            }
+
+            if (eventId == TourEventId.TOUR_CHANGED || eventId == TourEventId.UPDATE_UI) {
+               /*
+                * it is possible when a tour type was modified, the tour can be hidden or visible in
+                * the viewer because of the tour type filter
+                */
+               refreshCalendar();
+
+            } else if ((eventId == TourEventId.TOUR_SELECTION //
+                  || eventId == TourEventId.SLIDER_POSITION_CHANGED)
+
+                  && eventData instanceof ISelection) {
+
+               onSelectionChanged((ISelection) eventData);
+
+            } else if (eventId == TourEventId.TAG_STRUCTURE_CHANGED
+                  || eventId == TourEventId.ALL_TOURS_ARE_MODIFIED) {
+
+               refreshCalendar();
+            }
+         }
+      };
+
+      TourManager.getInstance().addTourEventListener(_tourEventListener);
+   }
+
+   /**
+    * Close all opened dialogs except the opening dialog.
+    *
+    * @param openingDialog
+    */
+   void closeOpenedDialogs(final IOpeningDialog openingDialog) {
 
-	void fireSelection(final long tourId) {
+      _openDlgMgr.closeOpenedDialogs(openingDialog);
+   }
 
-		TourManager.fireEventWithCustomData(TourEventId.TOUR_SELECTION, new SelectionTourId(tourId), this);
-	}
+   private void createActions() {
 
-	public CalendarGraph getCalendarGraph() {
-		return _calendarGraph;
-	}
+      _actionCalendarOptions = new ActionCalendarOptions(this);
+      _actionTourInfo = new ActionTourInfo(this, _parent);
 
-	SlideoutCalendarOptions getConfigSlideout() {
-		return _actionCalendarOptions.getSlideout();
-	}
+      /*
+       * Back
+       */
+      {
+         _actionBack = new Action() {
+            @Override
+            public void run() {
+               _calendarGraph.scroll_WithWheel_Screen(1);
+            }
+         };
+         _actionBack.setText(Messages.Calendar_View_Action_Back);
+         _actionBack.setToolTipText(Messages.Calendar_View_Action_Back_Tooltip);
+         _actionBack.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__ArrowUp));
+      }
+
+      /*
+       * Forward
+       */
+      {
+         _actionForward = new Action() {
+            @Override
+            public void run() {
+               _calendarGraph.scroll_WithWheel_Screen(-1);
+            }
+         };
+         _actionForward.setText(Messages.Calendar_View_Action_Forward);
+         _actionForward.setToolTipText(Messages.Calendar_View_Action_Forward_Tooltip);
+         _actionForward.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__ArrowDown));
+      }
+
+      /*
+       * Link with other views
+       */
+      {
+         _actionSetLinked = new Action(null, Action.AS_CHECK_BOX) {
+            @Override
+            public void run() {
+               _calendarGraph.setLinked(_stateIsLinked);
+            }
+         };
+         _actionSetLinked.setText(Messages.Calendar_View_Action_LinkWithOtherViews);
+         _actionSetLinked.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__SyncViews));
+         _actionSetLinked.setChecked(true);
+      }
+
+      /*
+       * Go to today
+       */
+      {
+         _actionGotoToday = new Action() {
+            @Override
+            public void run() {
+               _calendarGraph.gotoDate_Today();
+            }
+         };
+         _actionGotoToday.setText(Messages.Calendar_View_Action_GotoToday);
+         _actionGotoToday.setImageDescriptor(TourbookPlugin.getImageDescriptor(Messages.Image__Today));
+      }
+   }
+
+   @Override
+   public void createPartControl(final Composite parent) {
+
+      _parent = parent;
+
+      addPartListener();
+      addPrefListener();
+      addTourEventListener();
+
+      initUI(parent);
+
+      createUI(parent);
+
+      createActions();
+      fillActionBars();
+
+      addSelectionListener();
+
+      // set context menu
+      final Menu contextMenu = (new TourContextMenu()).createContextMenu(this, _calendarGraph, getLocalActions());
+      _calendarGraph.setMenu(contextMenu);
+
+      // set tour tooltip
+      _tourInfoToolTip = new CalendarTourInfoToolTip(this);
+
+      restoreState();
+
+      profileIsModified();
+
+      // restore selection
+      onSelectionChanged(getSite().getWorkbenchWindow().getSelectionService().getSelection());
+   }
+
+   private void createUI(final Composite parent) {
+
+      parent.addControlListener(new ControlAdapter() {
+
+         @Override
+         public void controlResized(final ControlEvent e) {
+            updateUI_Title(null, null);
+         }
+      });
+
+      final Composite container = new Composite(parent, SWT.NONE);
+      GridLayoutFactory.fillDefaults().numColumns(1).spacing(0, 0).applyTo(container);
+      {
+         createUI_10_Header(container);
+
+         // create composite with vertical scrollbars
+         _calendarContainer = new Composite(container, SWT.NO_BACKGROUND | SWT.V_SCROLL);
+         GridDataFactory.fillDefaults().grab(true, true).applyTo(_calendarContainer);
+         GridLayoutFactory.fillDefaults().spacing(0, 0).margins(0, 0).numColumns(1).applyTo(_calendarContainer);
+         {
+            _calendarGraph = new CalendarGraph(_calendarContainer, SWT.NO_BACKGROUND, this);
+            GridDataFactory.fillDefaults().grab(true, true).applyTo(_calendarGraph);
+         }
+      }
+   }
+
+   private void createUI_10_Header(final Composite parent) {
+
+      final Composite container = new Composite(parent, SWT.NONE);
+      GridDataFactory.fillDefaults().grab(true, false).applyTo(container);
+      GridLayoutFactory.swtDefaults().numColumns(2).applyTo(container);
+//    container.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_RED));
+      {
+         {
+            /*
+             * Title
+             */
+            _lblTitle = new Label(container, SWT.NONE);
+            GridDataFactory.fillDefaults()
+                  .grab(true, false)
+                  .align(SWT.FILL, SWT.CENTER)
+                  .applyTo(_lblTitle);
+            MTFont.setHeaderFont(_lblTitle);
+//          _lblTitle.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
+         }
+         {
+            /*
+             * Combo: Profiles
+             */
+            _comboProfiles = new Combo(container, SWT.READ_ONLY | SWT.BORDER);
+            _comboProfiles.setVisibleItemCount(30);
+            _comboProfiles.addSelectionListener(new SelectionAdapter() {
+               @Override
+               public void widgetSelected(final SelectionEvent e) {
+                  onSelectProfile();
+               }
+            });
+            GridDataFactory.fillDefaults()
+                  .align(SWT.BEGINNING, SWT.CENTER)
+                  .hint(_pc.convertWidthInCharsToPixels(40), SWT.DEFAULT)
+                  .applyTo(_comboProfiles);
+         }
+      }
+   }
+
+   @Override
+   public void dispose() {
+
+      TourManager.getInstance().removeTourEventListener(_tourEventListener);
+      getSite().getPage().removePostSelectionListener(_selectionListener);
+      _prefStore.removePropertyChangeListener(_prefChangeListener);
+
+      super.dispose();
+   }
+
+   private void fillActionBars() {
+
+      final IActionBars bars = getViewSite().getActionBars();
+
+      final IToolBarManager toolbarMrg = bars.getToolBarManager();
+
+      /*
+       * Toolbar
+       */
+      final CalendarYearMonthContributionItem yearMonthItem = new CalendarYearMonthContributionItem(_calendarGraph);
+      _calendarGraph.setYearMonthContributor(yearMonthItem);
+
+      toolbarMrg.add(yearMonthItem);
+
+      toolbarMrg.add(_actionGotoToday);
+      toolbarMrg.add(_actionSetLinked);
+      toolbarMrg.add(_actionTourInfo);
+      toolbarMrg.add(_actionCalendarOptions);
+   }
 
-	private ArrayList<Action> getLocalActions() {
+   void fillUI_Profiles() {
 
-		final ArrayList<Action> localActions = new ArrayList<>();
+      // 1. get the profiles
+      final ArrayList<CalendarProfile> allCalendarProfiles = CalendarProfileManager.getAllCalendarProfiles();
 
-		localActions.add(_actionBack);
-		localActions.add(_actionGotoToday);
-		localActions.add(_actionForward);
+      // 2. get active profile
+      final CalendarProfile activeProfile = CalendarProfileManager.getActiveCalendarProfile();
 
-		return localActions;
+      _comboProfiles.removeAll();
 
-	}
+      int selectIndex = 0;
 
-	@Override
-	public ArrayList<TourData> getSelectedTours() {
+      for (int profileIndex = 0; profileIndex < allCalendarProfiles.size(); profileIndex++) {
 
-		final ArrayList<TourData> selectedTourData = new ArrayList<>();
-		final ArrayList<Long> tourIdSet = new ArrayList<>();
-		tourIdSet.add(_calendarGraph.getSelectedTourId());
-		for (final Long tourId : tourIdSet) {
-			if (tourId > 0) { // < 0 means not selected
-				selectedTourData.add(TourManager.getInstance().getTourData(tourId));
-			}
-		}
-		return selectedTourData;
-	}
+         final CalendarProfile profile = allCalendarProfiles.get(profileIndex);
 
-	IDialogSettings getState() {
-		return _state;
-	}
+         _comboProfiles.add(CalendarProfileManager.getProfileName(profile, profile.profileName));
 
-	CalendarTourInfoToolTip getTourInfoTooltip() {
-		return _tourInfoToolTip;
-	}
+         // get index for active profile
+         if (activeProfile.equals(profile)) {
+            selectIndex = profileIndex;
+         }
+      }
 
-	private void initUI(final Composite parent) {
+      _comboProfiles.select(selectIndex);
+   }
 
-		_pc = new PixelConverter(parent);
-	}
+   void fireSelection(final long tourId) {
 
-	boolean isShowTourTooltip() {
+      TourManager.fireEventWithCustomData(TourEventId.TOUR_SELECTION, new SelectionTourId(tourId), this);
+   }
 
-		return _actionTourInfo.isChecked();
-	}
+   public CalendarGraph getCalendarGraph() {
+      return _calendarGraph;
+   }
 
-	private void onPartHidden() {
+   SlideoutCalendarOptions getConfigSlideout() {
+      return _actionCalendarOptions.getSlideout();
+   }
 
-		// hide config slideout
-		final SlideoutCalendarOptions slideout = getConfigSlideout();
+   private ArrayList<Action> getLocalActions() {
 
-		slideout.close();
-	}
+      final ArrayList<Action> localActions = new ArrayList<>();
 
-	private void onSelectionChanged(final ISelection selection) {
+      localActions.add(_actionBack);
+      localActions.add(_actionGotoToday);
+      localActions.add(_actionForward);
 
-		// show and select the selected tour
-		if (selection instanceof SelectionTourId) {
+      return localActions;
 
-			final Long newTourId = ((SelectionTourId) selection).getTourId();
-			final Long oldTourId = _calendarGraph.getSelectedTourId();
+   }
 
-			if (newTourId != oldTourId) {
+   @Override
+   public ArrayList<TourData> getSelectedTours() {
 
-				_stateIsLinked = _actionSetLinked.isChecked();
+      final ArrayList<TourData> selectedTourData = new ArrayList<>();
+      final ArrayList<Long> tourIdSet = new ArrayList<>();
+      tourIdSet.add(_calendarGraph.getSelectedTourId());
+      for (final Long tourId : tourIdSet) {
+         if (tourId > 0) { // < 0 means not selected
+            selectedTourData.add(TourManager.getInstance().getTourData(tourId));
+         }
+      }
+      return selectedTourData;
+   }
 
-				if (_stateIsLinked) {
-					_calendarGraph.gotoTour_Id(newTourId);
-				} else {
-					_calendarGraph.removeSelection();
-				}
-			}
+   IDialogSettings getState() {
+      return _state;
+   }
 
-		} else if (selection instanceof SelectionDeletedTours) {
+   CalendarTourInfoToolTip getTourInfoTooltip() {
+      return _tourInfoToolTip;
+   }
 
-			_calendarGraph.refreshCalendar();
-		}
-	}
+   private void initUI(final Composite parent) {
 
-	private void onSelectProfile() {
+      _pc = new PixelConverter(parent);
+   }
 
-		final int selectedIndex = _comboProfiles.getSelectionIndex();
-		final ArrayList<CalendarProfile> allProfiles = CalendarProfileManager.getAllCalendarProfiles();
+   boolean isShowTourTooltip() {
 
-		final CalendarProfile selectedProfile = allProfiles.get(selectedIndex);
-		final CalendarProfile activeProfile = CalendarProfileManager.getActiveCalendarProfile();
+      return _actionTourInfo.isChecked();
+   }
 
-		if (selectedProfile.equals(activeProfile)) {
+   private void onPartHidden() {
 
-			// profile has not changed
-			return;
-		}
+      // hide config slideout
+      final SlideoutCalendarOptions slideout = getConfigSlideout();
 
-		// when changing the profile then more/less data are needed
-//		_calendarGraph.stopDataProvider();
+      slideout.close();
+   }
 
-		CalendarProfileManager.setActiveCalendarProfile(selectedProfile, true);
-		CalendarProfileManager.getActiveCalendarProfile().dump();
-	}
+   private void onSelectionChanged(final ISelection selection) {
 
-	@Override
-	public void profileIsModified() {
+      // show and select the selected tour
+      if (selection instanceof SelectionTourId) {
 
-		fillUI_Profiles();
+         final Long newTourId = ((SelectionTourId) selection).getTourId();
+         final Long oldTourId = _calendarGraph.getSelectedTourId();
 
-		updateUI_Graph();
-	}
+         if (newTourId != oldTourId) {
 
-	private void refreshCalendar() {
+            _stateIsLinked = _actionSetLinked.isChecked();
 
-		if (null != _calendarGraph) {
+            if (_stateIsLinked) {
+               _calendarGraph.gotoTour_Id(newTourId);
+            } else {
+               _calendarGraph.removeSelection();
+            }
+         }
 
-			BusyIndicator.showWhile(Display.getCurrent(), new Runnable() {
-				@Override
-				public void run() {
-					_calendarGraph.refreshCalendar();
-				}
-			});
-		}
-	}
+      } else if (selection instanceof SelectionDeletedTours) {
 
-	private void restoreState() {
+         _calendarGraph.refreshCalendar();
+      }
+   }
 
-		_stateIsLinked = Util.getStateBoolean(_state, STATE_IS_LINKED, false);
-		_stateIsShowTourInfo = Util.getStateBoolean(_state, STATE_IS_SHOW_TOUR_INFO, true);
+   private void onSelectProfile() {
 
-		_actionSetLinked.setChecked(_stateIsLinked);
-		_actionTourInfo.setSelected(_stateIsShowTourInfo);
+      final int selectedIndex = _comboProfiles.getSelectionIndex();
+      final ArrayList<CalendarProfile> allProfiles = CalendarProfileManager.getAllCalendarProfiles();
 
-		final long epochDay = Util.getStateLong(_state, STATE_FIRST_DISPLAYED_EPOCH_DAY, Long.MIN_VALUE);
-		if (epochDay == Long.MIN_VALUE) {
-			_calendarGraph.gotoDate(
-					LocalDate
-							.now()
+      final CalendarProfile selectedProfile = allProfiles.get(selectedIndex);
+      final CalendarProfile activeProfile = CalendarProfileManager.getActiveCalendarProfile();
 
-							// adjust that not the week after today are displayed -> this is empty :-(
-							.minusWeeks(4),
-					true);
-		} else {
-			_calendarGraph.setFirstDay(LocalDate.ofEpochDay(epochDay));
-		}
+      if (selectedProfile.equals(activeProfile)) {
 
-		final Long selectedTourId = Util.getStateLong(_state, STATE_SELECTED_TOURS, new Long(-1));
-		_calendarGraph.setSelectionTourId(selectedTourId);
+         // profile has not changed
+         return;
+      }
 
-		// tooltip
-		_tourInfoToolTip.setPopupDelay(Util.getStateInt(_state, STATE_TOUR_TOOLTIP_DELAY, DEFAULT_TOUR_TOOLTIP_DELAY));
-	}
+      // when changing the profile then more/less data are needed
+//    _calendarGraph.stopDataProvider();
 
-	@PersistState
-	private void saveState() {
+      CalendarProfileManager.setActiveCalendarProfile(selectedProfile, true);
+      CalendarProfileManager.getActiveCalendarProfile().dump();
+   }
 
-		_state.put(STATE_IS_LINKED, _stateIsLinked);
-		_state.put(STATE_IS_SHOW_TOUR_INFO, _actionTourInfo.isChecked());
+   @Override
+   public void profileIsModified() {
 
-		// save current date displayed
-		_state.put(STATE_FIRST_DISPLAYED_EPOCH_DAY, _calendarGraph.getFirstDay().toLocalDate().toEpochDay());
+      fillUI_Profiles();
 
-		// until now we only implement single tour selection
-		_state.put(STATE_SELECTED_TOURS, _calendarGraph.getSelectedTourId());
+      updateUI_Graph();
+   }
 
-		CalendarProfileManager.saveState();
-	}
+   private void refreshCalendar() {
 
-	/**
-	 * Passing the focus request to the viewer's control.
-	 */
-	@Override
-	public void setFocus() {
-		_calendarContainer.setFocus();
-	}
+      if (null != _calendarGraph) {
 
-	void updateUI_Graph() {
+         BusyIndicator.showWhile(Display.getCurrent(), new Runnable() {
+            @Override
+            public void run() {
+               _calendarGraph.refreshCalendar();
+            }
+         });
+      }
+   }
 
-		// run async that the calling UI (slideout) is updated immediately
+   private void restoreState() {
 
-		Display.getDefault().asyncExec(new Runnable() {
-			@Override
-			public void run() {
-				_calendarGraph.updateUI_Layout(true);
-			}
-		});
-	}
+      _stateIsLinked = Util.getStateBoolean(_state, STATE_IS_LINKED, false);
+      _stateIsShowTourInfo = Util.getStateBoolean(_state, STATE_IS_SHOW_TOUR_INFO, true);
 
-	void updateUI_ProfileName(final CalendarProfile selectedProfile, final String modifiedProfileName) {
+      _actionSetLinked.setChecked(_stateIsLinked);
+      _actionTourInfo.setSelected(_stateIsShowTourInfo);
 
-		// update text in the combo
-		final int selectedIndex = _comboProfiles.getSelectionIndex();
-		_comboProfiles.setItem(
-				selectedIndex,
-				CalendarProfileManager.getProfileName(selectedProfile, modifiedProfileName));
-	}
+      final long epochDay = Util.getStateLong(_state, STATE_FIRST_DISPLAYED_EPOCH_DAY, Long.MIN_VALUE);
+      if (epochDay == Long.MIN_VALUE) {
+         _calendarGraph.gotoDate(
+               LocalDate
+                     .now()
 
-	void updateUI_Title(final LocalDate calendarFirstDay, final LocalDate calendarLastDay) {
+                     // adjust that not the week after today are displayed -> this is empty :-(
+                     .minusWeeks(4),
+               true);
+      } else {
+         _calendarGraph.setFirstDay(LocalDate.ofEpochDay(epochDay));
+      }
 
-		if (calendarFirstDay != null) {
+      final Long selectedTourId = Util.getStateLong(_state, STATE_SELECTED_TOURS, Long.valueOf(-1));
+      _calendarGraph.setSelectionTourId(selectedTourId);
 
-			if (calendarFirstDay.equals(_titleFirstDay) && calendarLastDay.equals(_titleLastDay)) {
+      // tooltip
+      _tourInfoToolTip.setPopupDelay(Util.getStateInt(_state, STATE_TOUR_TOOLTIP_DELAY, DEFAULT_TOUR_TOOLTIP_DELAY));
+   }
 
-				// these dates are already displayed
-				return;
-			}
+   @PersistState
+   private void saveState() {
 
-			_titleFirstDay = calendarFirstDay;
-			_titleLastDay = calendarLastDay;
-		}
+      _state.put(STATE_IS_LINKED, _stateIsLinked);
+      _state.put(STATE_IS_SHOW_TOUR_INFO, _actionTourInfo.isChecked());
 
-		if (_titleFirstDay == null) {
-			// this can occure when resized and not setup
-			return;
-		}
+      // save current date displayed
+      _state.put(STATE_FIRST_DISPLAYED_EPOCH_DAY, _calendarGraph.getFirstDay().toLocalDate().toEpochDay());
 
-		// reset to default header font
-		MTFont.setHeaderFont(_lblTitle);
+      // until now we only implement single tour selection
+      _state.put(STATE_SELECTED_TOURS, _calendarGraph.getSelectedTourId());
 
-		/*
-		 * Get title text
-		 */
-		String titleText = UI.EMPTY_STRING;
-		GC gc = new GC(_lblTitle);
-		{
-			final int availableWidth = _lblTitle.getSize().x;
+      CalendarProfileManager.saveState();
+   }
 
-			titleText = _titleFirstDay.format(TimeTools.Formatter_Date_L)
-					+ UI.DASH_WITH_DOUBLE_SPACE
-					+ _titleLastDay.format(TimeTools.Formatter_Date_L);
+   /**
+    * Passing the focus request to the viewer's control.
+    */
+   @Override
+   public void setFocus() {
+      _calendarContainer.setFocus();
+   }
 
-			int titleWidth = gc.stringExtent(titleText).x;
+   void updateUI_Graph() {
 
-			if (titleWidth > availableWidth) {
+      // run async that the calling UI (slideout) is updated immediately
 
-				titleText = _titleFirstDay.format(TimeTools.Formatter_Date_M)
-						+ UI.DASH_WITH_DOUBLE_SPACE
-						+ _titleLastDay.format(TimeTools.Formatter_Date_M);
+      Display.getDefault().asyncExec(new Runnable() {
+         @Override
+         public void run() {
+            _calendarGraph.updateUI_Layout(true);
+         }
+      });
+   }
 
-				titleWidth = gc.stringExtent(titleText).x;
+   void updateUI_ProfileName(final CalendarProfile selectedProfile, final String modifiedProfileName) {
 
-				if (titleWidth > availableWidth) {
+      // update text in the combo
+      final int selectedIndex = _comboProfiles.getSelectionIndex();
+      _comboProfiles.setItem(
+            selectedIndex,
+            CalendarProfileManager.getProfileName(selectedProfile, modifiedProfileName));
+   }
 
-					titleText = _titleFirstDay.format(TimeTools.Formatter_Date_S)
-							+ UI.DASH_WITH_SPACE
-							+ _titleLastDay.format(TimeTools.Formatter_Date_S);
+   void updateUI_Title(final LocalDate calendarFirstDay, final LocalDate calendarLastDay) {
 
-					titleWidth = gc.stringExtent(titleText).x;
+      if (calendarFirstDay != null) {
 
-					if (titleWidth > availableWidth) {
+         if (calendarFirstDay.equals(_titleFirstDay) && calendarLastDay.equals(_titleLastDay)) {
 
-						// set default font
-						_lblTitle.setFont(null);
+            // these dates are already displayed
+            return;
+         }
 
-						gc.dispose();
-						gc = new GC(_lblTitle);
+         _titleFirstDay = calendarFirstDay;
+         _titleLastDay = calendarLastDay;
+      }
 
-						titleWidth = gc.stringExtent(titleText).x;
+      if (_titleFirstDay == null) {
+         // this can occure when resized and not setup
+         return;
+      }
 
-						if (titleWidth > availableWidth) {
+      // reset to default header font
+      MTFont.setHeaderFont(_lblTitle);
 
-							/*
-							 * Force that the title is displayed the next time. There was a problem when
-							 * resizing the canvas and the title was empty.
-							 */
-							_titleFirstDay = null;
-						}
-					}
-				}
-			}
-		}
-		gc.dispose();
+      /*
+       * Get title text
+       */
+      String titleText = UI.EMPTY_STRING;
+      GC gc = new GC(_lblTitle);
+      {
+         final int availableWidth = _lblTitle.getSize().x;
 
-		_lblTitle.setText(titleText);
-	}
+         titleText = _titleFirstDay.format(TimeTools.Formatter_Date_L)
+               + UI.DASH_WITH_DOUBLE_SPACE
+               + _titleLastDay.format(TimeTools.Formatter_Date_L);
+
+         int titleWidth = gc.stringExtent(titleText).x;
+
+         if (titleWidth > availableWidth) {
+
+            titleText = _titleFirstDay.format(TimeTools.Formatter_Date_M)
+                  + UI.DASH_WITH_DOUBLE_SPACE
+                  + _titleLastDay.format(TimeTools.Formatter_Date_M);
+
+            titleWidth = gc.stringExtent(titleText).x;
+
+            if (titleWidth > availableWidth) {
+
+               titleText = _titleFirstDay.format(TimeTools.Formatter_Date_S)
+                     + UI.DASH_WITH_SPACE
+                     + _titleLastDay.format(TimeTools.Formatter_Date_S);
+
+               titleWidth = gc.stringExtent(titleText).x;
+
+               if (titleWidth > availableWidth) {
+
+                  // set default font
+                  _lblTitle.setFont(null);
+
+                  gc.dispose();
+                  gc = new GC(_lblTitle);
+
+                  titleWidth = gc.stringExtent(titleText).x;
+
+                  if (titleWidth > availableWidth) {
+
+                     /*
+                      * Force that the title is displayed the next time. There was a problem when
+                      * resizing the canvas and the title was empty.
+                      */
+                     _titleFirstDay = null;
+                  }
+               }
+            }
+         }
+      }
+      gc.dispose();
+
+      _lblTitle.setText(titleText);
+   }
 
 }

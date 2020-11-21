@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -89,9 +89,8 @@ public class TourCompareManager {
       sb.append(" FROM " + TourDatabase.TABLE_TOUR_COMPARED); //$NON-NLS-1$
       sb.append(" WHERE refTourId=?"); //$NON-NLS-1$
 
-      try {
+      try (Connection conn = TourDatabase.getInstance().getConnection()) {
 
-         final Connection conn = TourDatabase.getInstance().getConnection();
          final PreparedStatement statement = conn.prepareStatement(sb.toString());
          statement.setLong(1, refId);
 
@@ -108,8 +107,6 @@ public class TourCompareManager {
 
             storedComparedTours.put(dbTourId, storedComparedTour);
          }
-
-         conn.close();
 
       } catch (final SQLException e) {
          UI.showSQLException(e);
@@ -182,7 +179,7 @@ public class TourCompareManager {
             comparedTourItem.computedStartIndex,
             comparedTourItem.computedEndIndex);
 
-      final int tourRecordingTime = TourManager.computeTourRecordingTime(
+      final int tourDeviceTime_Elapsed = TourManager.computeTourDeviceTime_Elapsed(
             tourData,
             comparedTourItem.computedStartIndex,
             comparedTourItem.computedEndIndex);
@@ -199,7 +196,7 @@ public class TourCompareManager {
 
       comparedTour.setAvgPulse(avgPulse);
       comparedTour.setTourSpeed(speed);
-      comparedTour.setTourRecordingTime(tourRecordingTime);
+      comparedTour.setTourDeviceTime_Elapsed(tourDeviceTime_Elapsed);
 
       // persist entity
       ts.begin();
@@ -212,7 +209,7 @@ public class TourCompareManager {
       comparedTourItem.dbEndIndex = comparedTourItem.computedEndIndex;
 
       comparedTourItem.dbSpeed = speed;
-      comparedTourItem.dbRecordingTime = tourRecordingTime;
+      comparedTourItem.dbElapsedTime = tourDeviceTime_Elapsed;
    }
 
    public void clearCompareResult() {
@@ -396,16 +393,16 @@ public class TourCompareManager {
       compareResultItem.normalizedEndIndex = normCompareIndexStart + normIndexDiff;
 
       final float compareDistance = compareTourDataDistance[compareEndIndex] - compareTourDataDistance[compareStartIndex];
-      final int recordingTime = compareTourDataTime[compareEndIndex] - compareTourDataTime[compareStartIndex];
-      final int drivingTime = Math.max(0, recordingTime - compareTourData.getBreakTime(compareStartIndex, compareEndIndex));
+      final int elapsedTime = compareTourDataTime[compareEndIndex] - compareTourDataTime[compareStartIndex];
+      final int movingTime = Math.max(0, elapsedTime - compareTourData.getBreakTime(compareStartIndex, compareEndIndex));
 
-      compareResultItem.compareDrivingTime = drivingTime;
-      compareResultItem.compareRecordingTime = recordingTime;
+      compareResultItem.compareMovingTime = movingTime;
+      compareResultItem.compareElapsedTime = elapsedTime;
       compareResultItem.compareDistance = compareDistance;
-      compareResultItem.compareSpeed = compareDistance / drivingTime * 3.6f;
+      compareResultItem.compareSpeed = compareDistance / movingTime * 3.6f;
       compareResultItem.avgAltimeter = getAvgAltimeter(compareTourData, compareStartIndex, compareEndIndex);
 
-      compareResultItem.timeIntervall = compareTourData.getDeviceTimeInterval();
+      compareResultItem.timeInterval = compareTourData.getDeviceTimeInterval();
 
       return compareResultItem;
    }
@@ -561,9 +558,9 @@ public class TourCompareManager {
       final IWorkbenchWindow window = workbench.getActiveWorkbenchWindow();
       final IWorkbenchPage activePage = window.getActivePage();
 
-      final IViewPart yearStatView = activePage.findView(YearStatisticView.ID);
-      if (yearStatView instanceof YearStatisticView) {
-         navigatedTour = ((YearStatisticView) yearStatView).navigateTour(isNextTour);
+      final IViewPart yearStatView = activePage.findView(RefTour_YearStatistic_View.ID);
+      if (yearStatView instanceof RefTour_YearStatistic_View) {
+         navigatedTour = ((RefTour_YearStatistic_View) yearStatView).navigateTour(isNextTour);
       }
 
       final IViewPart comparedTours = activePage.findView(TourCompareResultView.ID);

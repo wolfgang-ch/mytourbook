@@ -335,7 +335,7 @@ public class ConconiView extends ViewPart {
 
       _selectedTour = markedTour;
 
-      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + GraphColorManager.PREF_GRAPH_HEARTBEAT + "."; //$NON-NLS-1$
+      final String prefGraphName = ICommonPreferences.GRAPH_COLORS + GraphColorManager.PREF_GRAPH_HEARTBEAT + UI.SYMBOL_DOT;
 
       final RGB rgbPrefLine = PreferenceConverter.getColor(//
             _commonPrefStore,
@@ -360,7 +360,7 @@ public class ConconiView extends ViewPart {
       float maxXValue = 0;
 
       /*
-       * create data series which contain valid data, reduce data that the highest value for an x
+       * create data series which contain valid data, reduce data that the highes value for an x
        * value is displayed
        */
       for (int tourIndex = 0; tourIndex < validDataLength; tourIndex++) {
@@ -1121,12 +1121,14 @@ public class ConconiView extends ViewPart {
    private void updateUI_12_SetupNewTour() {
 
       if (_conconiDataForSelectedTour == null) {
+         _scaleDeflection.setEnabled(false);
          return;
       }
 
       // update deflection scale
       final int maxDeflection = _conconiDataForSelectedTour.maxXValues.size();
       final int lastXIndex = maxDeflection - 1;
+      _scaleDeflection.setEnabled(true);
       _scaleDeflection.setMaximum(maxDeflection > 0 ? lastXIndex : 0);
 
       // ensure that too much scale ticks are displayed

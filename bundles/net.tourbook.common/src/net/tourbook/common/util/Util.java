@@ -19,7 +19,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,6 +35,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,6 +59,7 @@ import org.eclipse.swt.graphics.Resource;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Spinner;
@@ -83,6 +84,7 @@ public class Util {
    public static final String UNIQUE_ID_SUFFIX_GARMIN_FIT          = "12653"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_GARMIN_TCX          = "42984"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_GPX                 = "31683"; //$NON-NLS-1$
+   public static final String UNIQUE_ID_SUFFIX_MIO_105             = "10500"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_NMEA                = "32481"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_POLAR_HRM           = "63193"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_POLAR_PDD           = "76913"; //$NON-NLS-1$
@@ -91,6 +93,7 @@ public class Util {
    public static final String UNIQUE_ID_SUFFIX_SUUNTO2             = "92145"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_SUUNTO3             = "73198"; //$NON-NLS-1$
    public static final String UNIQUE_ID_SUFFIX_SUUNTO9             = "93281"; //$NON-NLS-1$
+   public static final String UNIQUE_ID_SUFFIX_SUUNTOQUEST         = "41502"; //$NON-NLS-1$
 
    /*
     * Default xml tags
@@ -998,6 +1001,30 @@ public class Util {
       return comboIndex;
    }
 
+   public static LocalDate getStateDate(final IDialogSettings state,
+                                        final String stateKey,
+                                        final LocalDate defaultValue,
+                                        final DateTime dateTimeControl) {
+
+      final String value = state.get(stateKey);
+      LocalDate parsedValue;
+
+      try {
+
+         parsedValue = LocalDate.parse(value);
+
+      } catch (final Exception e) {
+
+         parsedValue = defaultValue;
+      }
+
+      dateTimeControl.setYear(parsedValue.getYear());
+      dateTimeControl.setMonth(parsedValue.getMonthValue() - 1);
+      dateTimeControl.setDay(parsedValue.getDayOfMonth());
+
+      return parsedValue;
+   }
+
    /**
     * @param state
     * @param key
@@ -1047,6 +1074,46 @@ public class Util {
 
          return defaultValue;
       }
+   }
+
+   /**
+    * @param state
+    * @param key
+    * @param allDefaultValues
+    * @return Returns a string value from {@link IDialogSettings}. When the key is not found, the
+    *         default value is returned.
+    */
+   public static <E extends Enum<E>> ArrayList<E> getStateEnumList(final IDialogSettings state,
+                                                                   final String key,
+                                                                   final ArrayList<E> allDefaultValues) {
+
+      if (state == null) {
+         return allDefaultValues;
+      }
+
+      final String[] allStateValues = state.getArray(key);
+      if (allStateValues == null || allStateValues.length == 0 || allDefaultValues == null || allDefaultValues.size() == 0) {
+         return allDefaultValues;
+      }
+
+      final ArrayList<E> allEnumValues = new ArrayList<>();
+
+      try {
+
+         final Class<E> declaringClass = allDefaultValues.get(0).getDeclaringClass();
+
+         for (final String stateValue : allStateValues) {
+            if (stateValue != null) {
+               allEnumValues.add(Enum.valueOf(declaringClass, stateValue));
+            }
+         }
+
+      } catch (final IllegalArgumentException ex) {
+
+         return allDefaultValues;
+      }
+
+      return allEnumValues;
    }
 
    /**
@@ -1233,6 +1300,24 @@ public class Util {
       }
 
       final String stateValue = state.get(key);
+
+      return stateValue == null ? defaultValue : stateValue;
+   }
+
+   /**
+    * @param state
+    * @param key
+    * @param defaultValue
+    * @return Returns a string value from {@link IDialogSettings}. When the key is not found, the
+    *         default value is returned.
+    */
+   public static String[] getStateStringArray(final IDialogSettings state, final String key, final String[] defaultValue) {
+
+      if (state == null) {
+         return defaultValue;
+      }
+
+      final String[] stateValue = state.getArray(key);
 
       return stateValue == null ? defaultValue : stateValue;
    }
@@ -1562,7 +1647,7 @@ public class Util {
     *
     * @param memento
     * @param listKeyName
-    * @return
+    * @return Returns an array with long values or an empty array when values are not available
     */
    public static long[] getXmlLongArray(final XMLMemento memento, final String listKeyName) {
 
@@ -1697,6 +1782,34 @@ public class Util {
       final File file = new File(fileName);
 
       return file.isDirectory();
+   }
+
+   public static void logSimpleMessage(final Class<?> clazz,
+                                       final String message) {
+
+      System.out.println(String.format("%s [%s] %s",
+            UI.timeStampNano(),
+            clazz.getSimpleName(),
+            message));
+   }
+
+   public static void logSystemProperty_IsEnabled(final Class<?> clazz, final String propertyName, final String propertyDescription) {
+
+      System.out.println(UI.timeStampNano()
+            + " [" + clazz.getSimpleName() + "]" //$NON-NLS-1$ //$NON-NLS-2$
+            + " - System property \"" + propertyName + "\" is enabled -> " //$NON-NLS-1$ //$NON-NLS-2$
+            + propertyDescription);
+   }
+
+   public static void logSystemProperty_Value(final Class<?> clazz,
+                                              final String propertyName,
+                                              final String propertyValue,
+                                              final String propertyDescription) {
+
+      System.out.println(UI.timeStampNano()
+            + " [" + clazz.getSimpleName() + "]" //$NON-NLS-1$ //$NON-NLS-2$
+            + " - System property \"" + propertyName + "=" + propertyValue + "\" -> " //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+            + propertyDescription);
    }
 
    /**
@@ -1864,14 +1977,10 @@ public class Util {
 
       String content = UI.EMPTY_STRING;
 
-      try {
-
-         final FileInputStream stream = new FileInputStream(fileName);
+      try (FileInputStream stream = new FileInputStream(fileName)) {
 
          content = readContentFromStream(stream);
 
-      } catch (final FileNotFoundException e) {
-         StatusUtil.showStatus(e);
       } catch (final IOException e) {
          StatusUtil.showStatus(e);
       }
@@ -1891,9 +2000,7 @@ public class Util {
          final StringBuilder sb = new StringBuilder();
          String line;
 
-         try {
-
-            final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, UI.UTF_8));
+         try (final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, UI.UTF_8))) {
 
             while ((line = reader.readLine()) != null) {
                sb.append(line).append(UI.NEW_LINE);
@@ -2346,15 +2453,41 @@ public class Util {
       state.put(stateKey, stateValues);
    }
 
+   public static void setStateDate(final IDialogSettings state, final String stateKey, final DateTime dateTime) {
+
+      final LocalDate localDate = LocalDate.of(
+            dateTime.getYear(),
+            dateTime.getMonth() + 1,
+            dateTime.getDay());
+
+      state.put(stateKey, localDate.toString());
+   }
+
+   public static <E extends Enum<E>> void setStateEnum(final IDialogSettings state,
+                                                       final String stateKey,
+                                                       final ArrayList<E> allValues) {
+
+      final ArrayList<String> allEnumNames = new ArrayList<>();
+
+      for (final Enum<E> enumValue : allValues) {
+
+         if (allEnumNames != null) {
+            allEnumNames.add(enumValue.name());
+         }
+      }
+
+      if (allEnumNames.size() > 0) {
+         state.put(stateKey, allEnumNames.toArray(new String[allEnumNames.size()]));
+      }
+   }
+
    public static <E extends Enum<E>> void setStateEnum(final IDialogSettings state,
                                                        final String key,
                                                        final Enum<E> value) {
 
-      if (value == null) {
-         return;
+      if (value != null) {
+         state.put(key, value.name());
       }
-
-      state.put(key, value.name());
    }
 
    public static void setXmlDefaultHeader(final XMLMemento xmlHeader, final Bundle bundle) {

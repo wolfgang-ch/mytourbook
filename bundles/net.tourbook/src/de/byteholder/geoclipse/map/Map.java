@@ -147,6 +147,7 @@ public class Map extends Canvas {
 
    private static final String          TOUR_TOOLTIP_LABEL_DISTANCE           = net.tourbook.ui.Messages.Tour_Tooltip_Label_Distance;
    private static final String          TOUR_TOOLTIP_LABEL_MOVING_TIME        = net.tourbook.ui.Messages.Tour_Tooltip_Label_MovingTime;
+   private static final String          TOUR_TOOLTIP_LABEL_RECORDED_TIME      = net.tourbook.ui.Messages.Tour_Tooltip_Label_RecordedTime;
 
    private static final IDialogSettings _geoFilterState                       = TourGeoFilter_Manager.getState();
    /**
@@ -563,6 +564,7 @@ public class Map extends Canvas {
     * simple mode
     */
    private boolean             _isTourPaintMethodEnhanced;
+   private boolean             _isShowTourPaintMethodEnhancedWarning;
 
    private boolean             _isFastMapPainting;
    private boolean             _isFastMapPainting_Active;
@@ -819,7 +821,7 @@ public class Map extends Canvas {
       addTraverseListener(new TraverseListener() {
          @Override
          public void keyTraversed(final TraverseEvent e) {
-            // enable travers keys
+            // enable traverse keys
             e.doit = true;
          }
       });
@@ -1525,7 +1527,7 @@ public class Map extends Canvas {
       final GeoPosition geo1 = new GeoPosition(geoLat1, geoLon1);
       final GeoPosition geo2 = new GeoPosition(geoLat2, geoLon2);
 
-      // set lat/lon to a grid of 0.01°
+      // set lat/lon to a grid of 0.01ï¿½
       int geoGrid_Lat1_E2 = (int) (geoLat1 * 100);
       int geoGrid_Lon1_E2 = (int) (geoLon1 * 100);
 
@@ -3781,7 +3783,9 @@ public class Map extends Canvas {
 
       if (isPaintBreadCrumb) {
 
-         _tourBreadcrumb.paint(gc, isPaintTile_With_BasicMethod() == false);
+         final boolean isEnhancedPaintingMethod = isPaintTile_With_BasicMethod() == false;
+
+         _tourBreadcrumb.paint(gc, isEnhancedPaintingMethod && _isShowTourPaintMethodEnhancedWarning);
       }
 
       return isPaintTourInfo;
@@ -3936,10 +3940,15 @@ public class Map extends Canvas {
       final String tourTitle = tourData.getTourTitle();
       final boolean isTourTitle = tourTitle.length() > 0;
 
-      final long movingTime = tourData.getTourDrivingTime();
+      final long movingTime = tourData.getTourComputedTime_Moving();
       final String textMovingTime = String.format(VALUE_FORMAT_2,
             TOUR_TOOLTIP_LABEL_MOVING_TIME,
-            FormatManager.formatDrivingTime(movingTime));
+            FormatManager.formatMovingTime(movingTime));
+
+      final long recordedTime = tourData.getTourDeviceTime_Recorded();
+      final String textRecordedTime = String.format(VALUE_FORMAT_2,
+            TOUR_TOOLTIP_LABEL_RECORDED_TIME,
+            FormatManager.formatRecordedTime(recordedTime));
 
       final float distance = tourData.getTourDistance() / net.tourbook.ui.UI.UNIT_VALUE_DISTANCE;
       final String textDistance = String.format(VALUE_FORMAT_3,
@@ -3947,7 +3956,7 @@ public class Map extends Canvas {
             FormatManager.formatDistance(distance / 1000.0),
             UI.UNIT_LABEL_DISTANCE);
 
-      final String valueText = textDistance + UI.DASH_WITH_DOUBLE_SPACE + textMovingTime;
+      final String valueText = textDistance + UI.DASH_WITH_DOUBLE_SPACE + textMovingTime + UI.DASH_WITH_DOUBLE_SPACE + textRecordedTime;
 
       final Point dateTimeSize = gc.textExtent(tourDateTime);
       final Point valueSize = gc.textExtent(valueText);
@@ -5290,7 +5299,7 @@ public class Map extends Canvas {
    private boolean parsePOIText(String text) {
 
       try {
-         text = URLDecoder.decode(text, "UTF-8"); //$NON-NLS-1$
+         text = URLDecoder.decode(text, UI.UTF_8);
       } catch (final UnsupportedEncodingException e) {
          StatusUtil.log(e);
       }
@@ -6119,9 +6128,10 @@ public class Map extends Canvas {
       _isScaleVisible = isScaleVisible;
    }
 
-   public void setTourPaintMethodEnhanced(final boolean isEnhanced) {
+   public void setTourPaintMethodEnhanced(final boolean isEnhanced, final boolean isShowWarning) {
 
       _isTourPaintMethodEnhanced = isEnhanced;
+      _isShowTourPaintMethodEnhancedWarning = isShowWarning;
 
       disposeOverlayImageCache();
    }

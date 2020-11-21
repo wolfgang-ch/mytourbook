@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2020 Frédéric Bard and Contributors
+ * Copyright (C) 2021 Frédéric Bard and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -16,6 +16,8 @@
 package net.tourbook.trainingstress;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import net.tourbook.common.UI;
 import net.tourbook.data.TourData;
@@ -34,33 +36,15 @@ import org.apache.commons.math3.exception.NoBracketingException;
  * - Use this equation to display an estimated power graph in the tour chart
  * - Add the GOVSS column in the tour book view
  */
-public class Govss {
+public class Govss extends TrainingStress {
    //TODO; When a tour has its tour type changed, if this new tour type is not in the govss list, we remove the tourid from the performancemodeling table
 
-   private TourPerson _tourPerson;
-   private TourData   _tourData;
-
    public Govss(final TourPerson tourPerson) {
-      this._tourPerson = tourPerson;
+      super(tourPerson, null);
    }
 
    public Govss(final TourPerson tourPerson, final TourData tourData) {
-      this._tourPerson = tourPerson;
-      this._tourData = tourData;
-   }
-
-   /**
-    * Function that calculates the GOVSS (Gravity Ordered Velocity Stress Score) for a given run and
-    * athlete.
-    *
-    * @return The GOVSS value
-    */
-   public int Compute() {
-      if (_tourData == null || _tourData.timeSerie == null || _tourData.timeSerie.length < 2) {
-         return 0;
-      }
-
-      return Compute(0, _tourData.timeSerie.length);
+      super(tourPerson, tourData);
    }
 
    /**
@@ -75,8 +59,9 @@ public class Govss {
     *
     * @return The GOVSS value
     */
+   @Override
    public int Compute(final int startIndex, final int endIndex) {
-      if (_tourPerson == null || _tourData == null || startIndex >= endIndex) {
+      if (_tourPerson == null || _tourData == null || _tourData.timeSerie == null || startIndex >= endIndex) {
          return 0;
       }
 
@@ -85,16 +70,10 @@ public class Govss {
       final float athleteThresholdPower = _tourPerson.getGovssThresholdPower();
 
       // 3. Analyze the data from a particular workout from an athlete’s log, computing 120 second rolling averages from velocity and slope data.
-      final ArrayList<Double> powerValues = computePowerValues();
-
-      if (powerValues == null || powerValues.size() == 0) {
-         return 0;
-      }
+      List<Double> powerValues = computePowerValues();
 
       // 4. Raise the values in step 3 to the 4th power.
-      for (int index = 0; index < powerValues.size(); index++) {
-         powerValues.set(index, Math.pow(powerValues.get(index), 4));
-      }
+      powerValues = powerValues.stream().map(powerValue -> Math.pow(powerValue, 4)).collect(Collectors.toList());
 
       // 5. Average values from step 4.
       final double averagePower = powerValues.stream().mapToDouble(Double::doubleValue).average().getAsDouble();
@@ -106,7 +85,7 @@ public class Govss {
       final float intensityWeighingFactor = lactateNormalizedPower / athleteThresholdPower;
 
       // 8. Multiply the Lactate Normalized Power by the duration of the workout in seconds to obtain the normalized work performed in joules.
-      final int normalizedWork = Math.round(lactateNormalizedPower * _tourData.getTourRecordingTime());
+      final int normalizedWork = Math.round(lactateNormalizedPower * _tourData.getTourDeviceTime_Recorded());
 
       // 9. Multiply value obtained in step 8 by the Intensity Weighting Fraction to get a raw training stress value.
       float trainingStressValue = normalizedWork * intensityWeighingFactor;
@@ -130,9 +109,7 @@ public class Govss {
    private double computeCostAerodynamicDrag(final float speed) {
 
       final double Af = 0.2025 * 0.266 * Math.pow(_tourPerson.getHeight(), 0.725) * Math.pow(_tourPerson.getWeight(), 0.425);
-      final double CAero = 0.5 * 1.2 * 0.9 * Af * Math.pow(speed, 2) / _tourPerson.getWeight();
-
-      return CAero;
+      return 0.5 * 1.2 * 0.9 * Af * Math.pow(speed, 2) / _tourPerson.getWeight();
    }
 
    /**
@@ -156,9 +133,8 @@ public class Govss {
     */
    private double computeCostKineticEnergy(final double distance, final double initialSpeed, final double speed) {
 
-      final double Ckin = distance > 0 ? 0.5 * (Math.pow(speed, 2) - Math.pow(initialSpeed, 2)) / distance : 0;
+      return distance > 0 ? 0.5 * (Math.pow(speed, 2) - Math.pow(initialSpeed, 2)) / distance : 0;
 
-      return Ckin;
    }
 
    /**
@@ -184,7 +160,7 @@ public class Govss {
       final String nPace = UI.format_mm_ss((long) pace);
       System.out.println("Normalized pace min/mile = " + nPace);
 
-      return Compute(0, _tourData.timeSerie.length);
+      return Compute(startIndex, endIndex);
    }
 
    /**
@@ -199,20 +175,15 @@ public class Govss {
       final double Cslope = computeCostDistanceWithSlope(slope);
       final double efficiency = (0.25 + (0.054 * speed)) * (1 - ((0.5 * speed) / 8.33));
 
-      final double power = (CAero + Ckin + Cslope * efficiency) * speed * _tourPerson.getWeight();
-
-      return power;
+      return (CAero + Ckin + Cslope * efficiency) * speed * _tourPerson.getWeight();
    }
 
-   private ArrayList<Double> computePowerValues() {
-      if (_tourData == null || _tourData.timeSerie == null) {
-         return null;
-      }
+   private List<Double> computePowerValues() {
 
       final int[] timeSerie = _tourData.timeSerie;
       final int timeSeriesLength = timeSerie.length;
 
-      final ArrayList<Double> powerValues = new ArrayList<>();
+      final List<Double> powerValues = new ArrayList<>();
 
       final int rollingAverageInterval = 120; // The formula calls for 120 second rolling averages
       double powerValue = 0;
@@ -223,30 +194,30 @@ public class Govss {
       float initialSpeed = 0;
       float currentSpeed = 0;
 
-      for (; serieEndIndex < timeSeriesLength - 1;) {
+      while (serieEndIndex < timeSeriesLength - 1) {
 
-         double currentRecordingTime = 0;
+         double currentElapsedTime = 0;
          serieStartIndex = serieEndIndex;
 
-         for (; currentRecordingTime < rollingAverageInterval && serieEndIndex < timeSeriesLength - 1;) {
+         while (currentElapsedTime < rollingAverageInterval && serieEndIndex < timeSeriesLength - 1) {
 
             ++serieEndIndex;
-            currentRecordingTime = Math.max(0,
-                  timeSerie[serieEndIndex] - timeSerie[serieStartIndex] - _tourData.getBreakTime(serieStartIndex, serieEndIndex));
+            currentElapsedTime = Math.max(0,
+                  timeSerie[serieEndIndex] - timeSerie[serieStartIndex]);//- _tourData.getPausedTime(serieStartIndex, serieEndIndex));
          }
 
-         currentSpeed = TourManager.computeTourSpeed(_tourData, serieStartIndex, serieEndIndex);
-         //Convert the speed (km/h) to velocity (m/s)
-         currentSpeed /= 3.6;
          currentDistance = TourManager.computeTourDistance(_tourData, serieStartIndex, serieEndIndex);
          currentSlope = TourManager.computeTourAverageGradient(_tourData, serieStartIndex, serieEndIndex);
+
+         //Compute the speed (m/s)
+         currentSpeed = (float) (currentElapsedTime == 0 ? 0 : currentDistance / currentElapsedTime);
+
          powerValue = ComputePower(currentDistance, currentSlope, initialSpeed, currentSpeed);
 
-         if (currentSlope > -1 && currentSlope < 1 && currentDistance > 0) {
+         if (currentSlope > -1 && currentSlope < 1) {
             powerValues.add(powerValue);
+            initialSpeed = currentSpeed;
          }
-
-         initialSpeed = currentSpeed;
       }
 
       return powerValues;

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2020  Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -20,7 +20,6 @@ import de.byteholder.geoclipse.logging.GeoException;
 import de.byteholder.geoclipse.map.BoundingBoxEPSG4326;
 import de.byteholder.geoclipse.map.ITileLoader;
 import de.byteholder.geoclipse.map.Tile;
-import de.byteholder.geoclipse.map.UI;
 import de.byteholder.geoclipse.util.Util;
 
 import java.io.IOException;
@@ -32,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
+import net.tourbook.common.UI;
 import net.tourbook.common.util.StatusUtil;
 
 import org.eclipse.core.runtime.IPath;
@@ -233,7 +233,7 @@ public class MPWms extends MP implements ITileLoader {
       }
 
       // remove invalid characters from the key
-      final String customTileKey = UI.createIdFromName(sb.toString(), 150);
+      final String customTileKey = de.byteholder.geoclipse.map.UI.createIdFromName(sb.toString(), 150);
 
       return customTileKey;
    }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2020  Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -113,7 +113,7 @@ public class MtLayer implements Comparable<MtLayer>, Cloneable {
       sb.append(_positionIndex);
       sb.append(" v:"); //$NON-NLS-1$
       sb.append(_isDisplayedInMap);
-      sb.append(" "); //$NON-NLS-1$
+      sb.append(net.tourbook.common.UI.SPACE1);
       sb.append(_mtGeoLayer.getName());
 
       return sb.toString();

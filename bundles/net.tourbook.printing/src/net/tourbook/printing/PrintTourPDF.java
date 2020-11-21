@@ -39,9 +39,9 @@ import org.xml.sax.SAXException;
  */
 public class PrintTourPDF extends PrintTourExtension {
 
-   private static final String TOURDATA_2_FO_XSL = "/printing-templates/tourdata2fo.xsl";        //$NON-NLS-1$
+   private static final String TOURDATA_2_FO_XSL = "/printing-templates/tourdata2fo.xsl";                  //$NON-NLS-1$
 
-   private final FopFactory    _fopFactory       = FopFactory.newInstance(new File(".").toURI());
+   private final FopFactory    _fopFactory       = FopFactory.newInstance(new File(UI.SYMBOL_DOT).toURI());
 
    private DialogPrintTour     dpt;
 
@@ -61,7 +61,7 @@ public class PrintTourPDF extends PrintTourExtension {
    private String formatStartDate(final TourData _tourData) {
 
       final ZonedDateTime dtTourStart = _tourData.getTourStartTime();
-      final ZonedDateTime dtTourEnd = dtTourStart.plusSeconds(_tourData.getTourRecordingTime());
+      final ZonedDateTime dtTourEnd = dtTourStart.plusSeconds(_tourData.getTourDeviceTime_Elapsed());
 
       return String.format(
             net.tourbook.ui.Messages.Tour_Tooltip_Format_DateWeekTime,
@@ -132,7 +132,7 @@ public class PrintTourPDF extends PrintTourExtension {
 
             StreamSource xmlSource;
             try {
-               xmlSource = new StreamSource(new ByteArrayInputStream(xml.getBytes("UTF-8"))); //$NON-NLS-1$
+               xmlSource = new StreamSource(new ByteArrayInputStream(xml.getBytes(UI.UTF_8)));
             } catch (final UnsupportedEncodingException e) {
                //if UTF-8 fails, try default encoding
                xmlSource = new StreamSource(new ByteArrayInputStream(xml.getBytes()));
@@ -167,12 +167,8 @@ public class PrintTourPDF extends PrintTourExtension {
                e.printStackTrace();
             }
          }
-      } catch (final SAXException e1) {
-         // TODO Auto-generated catch block
-         e1.printStackTrace();
-      } catch (final IOException e1) {
-         // TODO Auto-generated catch block
-         e1.printStackTrace();
+      } catch (final SAXException | IOException e) {
+         e.printStackTrace();
       } finally {
          if (pdfContent != null) {
             try {

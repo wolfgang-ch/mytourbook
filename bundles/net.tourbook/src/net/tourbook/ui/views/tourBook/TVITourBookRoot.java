@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -15,116 +15,134 @@
  *******************************************************************************/
 package net.tourbook.ui.views.tourBook;
 
-import de.byteholder.geoclipse.map.UI;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
+import net.tourbook.common.UI;
 import net.tourbook.common.time.TourDateTime;
 import net.tourbook.common.util.SQL;
 import net.tourbook.common.util.TreeViewerItem;
-import net.tourbook.common.util.Util;
 import net.tourbook.database.TourDatabase;
+import net.tourbook.tag.tour.filter.TourTagFilterManager;
+import net.tourbook.tag.tour.filter.TourTagFilterSqlJoinBuilder;
 import net.tourbook.ui.SQLFilter;
 
 public class TVITourBookRoot extends TVITourBookItem {
 
+   /**
+    * @param view
+    * @param viewLayout
+    */
    TVITourBookRoot(final TourBookView view) {
+
       super(view);
    }
 
    @Override
    protected void fetchChildren() {
 
-      /*
-       * set the children for the root item, these are year items
-       */
-      final ArrayList<TreeViewerItem> children = new ArrayList<>();
-      setChildren(children);
+      getItemsHierarchical();
+   }
 
-      final SQLFilter sqlFilter = new SQLFilter(SQLFilter.TAG_FILTER);
-      String fromTourData;
+   private void getItemsHierarchical() {
 
-      final String sqlFilterWhereClause = sqlFilter.getWhereClause().trim();
-      final boolean isSqlWhereClause = sqlFilterWhereClause.length() > 0;
-      final String sqlWhereClause = isSqlWhereClause
-            ? " WHERE 1=1 " + sqlFilterWhereClause + NL //$NON-NLS-1$
-            : UI.EMPTY_STRING;
+      String sql = null;
 
-      if (sqlFilter.isTagFilterActive()) {
+      try (Connection conn = TourDatabase.getInstance().getConnection()) {
 
-         // with tag filter
+         /*
+          * set the children for the root item, these are year items
+          */
+         final ArrayList<TreeViewerItem> children = new ArrayList<>();
+         setChildren(children);
 
-         fromTourData = NL
+         final SQLFilter sqlAppFilter = new SQLFilter(SQLFilter.TAG_FILTER);
+         String sqlFromTourData;
 
-               + "FROM (            " + NL //$NON-NLS-1$
+         final String sqlFilterWhereClause = sqlAppFilter.getWhereClause().trim();
+         final boolean isSqlWhereClause = sqlFilterWhereClause.length() > 0;
 
-               + " SELECT           " + NL //$NON-NLS-1$
+         final String sqlWhereClause = isSqlWhereClause
+               ? "WHERE 1=1 " + NL + sqlFilterWhereClause + NL //$NON-NLS-1$
+               : UI.EMPTY_STRING;
 
-               + "  StartYear,      " + NL //$NON-NLS-1$
-               + SQL_SUM_FIELDS + NL
+         final TourTagFilterSqlJoinBuilder tagFilterSqlJoinBuilder = new TourTagFilterSqlJoinBuilder();
 
-               + "  FROM " + TourDatabase.TABLE_TOUR_DATA + NL//$NON-NLS-1$
+         if (TourTagFilterManager.isTourTagFilterEnabled()) {
 
-               // get tag id's
-               + "  LEFT OUTER JOIN " + TourDatabase.JOINTABLE__TOURDATA__TOURTAG + " jTdataTtag" + NL //$NON-NLS-1$ //$NON-NLS-2$
-               + "  ON tourID = jTdataTtag.TourData_tourId   " + NL //$NON-NLS-1$
+            // with tag filter
 
-               + sqlWhereClause
+            sqlFromTourData = UI.EMPTY_STRING
 
-               + ") td              " + NL//$NON-NLS-1$
+                  + "FROM (" + NL //                                                         //$NON-NLS-1$
+
+                  + "   SELECT" + NL //                                                      //$NON-NLS-1$
+
+                  // this is necessary otherwise tours can occure multiple times when a tour contains multiple tags !!!
+                  + "      DISTINCT TourId," + NL //                                         //$NON-NLS-1$
+
+                  + "      StartYear," + NL //                                               //$NON-NLS-1$
+                  + "      " + SQL_SUM_FIELDS //$NON-NLS-1$
+
+                  + "   FROM TOURDATA" + NL //                                               //$NON-NLS-1$
+
+                  + "   " + tagFilterSqlJoinBuilder.getSqlTagJoinTable() + " jTdataTtag" //  //$NON-NLS-1$ //$NON-NLS-2$
+                  + "   ON TourData.tourId = jTdataTtag.TourData_tourId" + NL //             //$NON-NLS-1$
+
+                  + "   " + sqlWhereClause //$NON-NLS-1$
+
+                  + ") NecessaryNameOtherwiseItDoNotWork" + NL //                            //$NON-NLS-1$
+            ;
+
+         } else {
+
+            // without tag filter
+
+            sqlFromTourData = UI.EMPTY_STRING
+
+                  + " FROM " + TourDatabase.TABLE_TOUR_DATA + NL //$NON-NLS-1$
+
+                  + sqlWhereClause;
+         }
+
+         final boolean isShowSummaryRow = tourBookView.isShowSummaryRow();
+
+         final String sqlGroupBy = isShowSummaryRow
+
+               // show a summary row
+               ? "GROUP BY ROLLUP(StartYear)" + NL //          //$NON-NLS-1$
+               : "GROUP BY StartYear" + NL; //                 //$NON-NLS-1$
+
+         sql = NL +
+
+               "SELECT" + NL //                                //$NON-NLS-1$
+
+               + "   StartYear," + NL //                       //$NON-NLS-1$
+               + "   " + SQL_SUM_COLUMNS //$NON-NLS-1$
+
+               + sqlFromTourData
+               + sqlGroupBy
+
+               + "ORDER BY StartYear" + NL //                  //$NON-NLS-1$
          ;
 
-      } else {
+         final PreparedStatement prepStmt = conn.prepareStatement(sql);
 
-         // without tag filter
+         int paramIndex = 1;
 
-         fromTourData = NL
+         paramIndex = tagFilterSqlJoinBuilder.setParameters(prepStmt, paramIndex);
 
-               + " FROM " + TourDatabase.TABLE_TOUR_DATA + NL //$NON-NLS-1$
-
-               + sqlWhereClause;
-      }
-
-      final boolean isShowSummaryRow = tourBookView.isShowSummaryRow();
-
-      final String groupBy = isShowSummaryRow
-
-            // show a summary row
-            ? " GROUP BY ROLLUP(StartYear)   " + NL //$NON-NLS-1$
-            : " GROUP BY StartYear           " + NL; //$NON-NLS-1$
-
-      final String sql = NL +
-
-            "SELECT                    " + NL //$NON-NLS-1$
-
-            + " StartYear,             " + NL //$NON-NLS-1$
-            + SQL_SUM_COLUMNS
-
-            + fromTourData
-            + groupBy
-
-            + " ORDER BY StartYear     " + NL //$NON-NLS-1$
-      ;
-
-      Connection conn = null;
-
-      try {
-
-         conn = TourDatabase.getInstance().getConnection();
-
-         final PreparedStatement statement = conn.prepareStatement(sql);
-         sqlFilter.setParameters(statement, 1);
+         sqlAppFilter.setParameters(prepStmt, paramIndex);
 
          TVITourBookYear yearItem = null;
 
          int yearIndex = 0;
          int summaryIndex = 0;
 
-         final ResultSet result = statement.executeQuery();
+         final ResultSet result = prepStmt.executeQuery();
          while (result.next()) {
 
             final int dbYear = result.getInt(1);
@@ -173,8 +191,6 @@ public class TVITourBookRoot extends TVITourBookItem {
 
       } catch (final SQLException e) {
          SQL.showException(e, sql);
-      } finally {
-         Util.closeSql(conn);
       }
    }
 

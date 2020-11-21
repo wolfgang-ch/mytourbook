@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2021 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -18,6 +18,7 @@ package net.tourbook.training;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import net.tourbook.Messages;
 import net.tourbook.application.TourbookPlugin;
@@ -361,7 +362,7 @@ public class TrainingView extends ViewPart {
 
                final ArrayList<TourData> modifiedTours = ((TourEvent) eventData).getModifiedTours();
 
-               if ((modifiedTours != null) && (modifiedTours.size() > 0)) {
+               if ((modifiedTours != null) && (!modifiedTours.isEmpty())) {
                   updateUI_20(modifiedTours.get(0));
                }
             } else if (eventId == TourEventId.TOUR_CHART_PROPERTY_IS_MODIFIED) {
@@ -826,7 +827,7 @@ public class TrainingView extends ViewPart {
       }
 
       getSite().getPage().removePostSelectionListener(_postSelectionListener);
-      
+
       // an NPE occured when the part could not be created
       if (_partListener != null) {
          getViewSite().getPage().removePartListener(_partListener);
@@ -991,7 +992,7 @@ public class TrainingView extends ViewPart {
 
          final SelectionTourIds selectionTourId = (SelectionTourIds) selection;
          final ArrayList<Long> tourIds = selectionTourId.getTourIds();
-         if (tourIds != null && tourIds.size() > 0) {
+         if (tourIds != null && !tourIds.isEmpty()) {
             updateUI(tourIds.get(0));
          }
 
@@ -1101,7 +1102,7 @@ public class TrainingView extends ViewPart {
             }
 
             final ArrayList<TourData> selectedTours = TourManager.getSelectedTours();
-            if (selectedTours != null && selectedTours.size() > 0) {
+            if (selectedTours != null && !selectedTours.isEmpty()) {
                updateUI_20(selectedTours.get(0));
             }
          }
@@ -1188,8 +1189,8 @@ public class TrainingView extends ViewPart {
       /*
        * check HR zones
        */
-      final ArrayList<TourPersonHRZone> personHrZones = _currentPerson.getHrZonesSorted();
-      if (personHrZones.size() == 0) {
+      final List<TourPersonHRZone> personHrZones = _currentPerson.getHrZonesSorted();
+      if (personHrZones.isEmpty()) {
 
          // hr zones are required
 
@@ -1231,7 +1232,7 @@ public class TrainingView extends ViewPart {
       final boolean[] breakTimeSerie = _tourData.getBreakTimeSerie();
       final int timeSerieSize = timeSerie.length;
 
-      final ArrayList<TourPersonHRZone> hrSortedZones = _currentPerson.getHrZonesSorted();
+      final List<TourPersonHRZone> hrSortedZones = _currentPerson.getHrZonesSorted();
       final int zoneSize = hrSortedZones.size();
 
       final RGB[] rgbBright = new RGB[zoneSize];
@@ -1399,7 +1400,7 @@ public class TrainingView extends ViewPart {
 
       final int personZoneSize = _personHrZones.size();
       final int[] tourHrZoneTimes = _tourData.getHrZones();
-      final long drivingTime = _tourData.getTourDrivingTime();
+      final long movingTime = _tourData.getTourComputedTime_Moving();
 
       _tourHrZonePercent = new double[personZoneSize];
 
@@ -1417,9 +1418,9 @@ public class TrainingView extends ViewPart {
          }
 
          final double zoneTime = tourHrZoneTimes[tourZoneIndex];
-         final double zoneTimePercent = drivingTime == 0 //
+         final double zoneTimePercent = movingTime == 0 //
                ? 0
-               : zoneTime * 100.0 / drivingTime;
+               : zoneTime * 100.0 / movingTime;
 
          if (zoneTime == -1) {
             // this zone and following zones are not available
@@ -1492,8 +1493,7 @@ public class TrainingView extends ViewPart {
          _lblTourMinMaxValue[tourZoneIndex].setToolTipText(hrZoneTooltip);
 
          _lblTourMinMaxHours[tourZoneIndex].setText(net.tourbook.common.UI
-               .format_hh_mm((long) (zoneTime + 30))
-               .toString());
+               .format_hh_mm((long) (zoneTime + 30)));
          _lblTourMinMaxHours[tourZoneIndex].setToolTipText(hrZoneTooltip);
 
          _lblHRZoneName[tourZoneIndex].setToolTipText(hrZoneTooltip);

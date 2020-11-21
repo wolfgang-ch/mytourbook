@@ -56,14 +56,13 @@ public class TVICatalogRootItem extends TVICatalogItem {
             + "(	select sum(1)" //$NON-NLS-1$
             + ("		from " + TourDatabase.TABLE_TOUR_COMPARED) //$NON-NLS-1$
             + ("		where " + TourDatabase.TABLE_TOUR_COMPARED + ".reftourid=" + TourDatabase.TABLE_TOUR_REFERENCE + ".refid") //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-            + ")" //$NON-NLS-1$
+            + UI.SYMBOL_BRACKET_RIGHT
 
             + (" FROM " + TourDatabase.TABLE_TOUR_REFERENCE) //$NON-NLS-1$
             + (" ORDER BY label"); //$NON-NLS-1$
 
-      try {
+      try (Connection conn = TourDatabase.getInstance().getConnection()) {
 
-         final Connection conn = TourDatabase.getInstance().getConnection();
          final PreparedStatement statement = conn.prepareStatement(sql);
          final ResultSet result = statement.executeQuery();
 
@@ -77,8 +76,6 @@ public class TVICatalogRootItem extends TVICatalogItem {
             refItem.setTourId(result.getLong(3));
             refItem.tourCounter = result.getInt(4);
          }
-
-         conn.close();
 
       } catch (final SQLException e) {
          UI.showSQLException(e);

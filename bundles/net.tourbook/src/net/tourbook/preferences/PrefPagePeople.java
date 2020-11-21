@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2020 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2021 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -29,6 +29,7 @@ import net.tourbook.Messages;
 import net.tourbook.application.TourbookPlugin;
 import net.tourbook.common.UI;
 import net.tourbook.common.time.TimeTools;
+import net.tourbook.common.util.StringUtils;
 import net.tourbook.common.util.Util;
 import net.tourbook.data.HrZoneContext;
 import net.tourbook.data.TourData;
@@ -119,12 +120,6 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
 
    public static final String                   ID                                  = "net.tourbook.preferences.PrefPagePeopleId";            //$NON-NLS-1$
 
-   /**
-    * On Linux an async selection event is fired since e4
-    */
-   private static final String                  FIX_LINUX_ASYNC_EVENT_1             = "FIX_LINUX_ASYNC_EVENT_1";                              //$NON-NLS-1$
-   private static final String                  FIX_LINUX_ASYNC_EVENT_2             = "FIX_LINUX_ASYNC_EVENT_2";                              //$NON-NLS-1$
-   //
    private static final String                  STATE_SELECTED_PERSON               = "selectedPersonId";                                     //$NON-NLS-1$
    private static final String                  STATE_SELECTED_TAB_FOLDER           = "selectedTabFolder";                                    //$NON-NLS-1$
 
@@ -169,10 +164,8 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       _nf2.setMaximumFractionDigits(2);
    }
 
-   private final boolean             _isOSX                     = net.tourbook.common.UI.IS_OSX;
-   private final boolean             _isLinux                   = net.tourbook.common.UI.IS_LINUX;
-
    private SelectionListener         _defaultSelectionListener;
+   private MouseWheelListener        _defaultMouseWheelListener;
    private ModifyListener            _defaultModifyListener;
    private MouseListener             _hrZoneMouseListener;
    private IPropertyChangeListener   _prefChangeListener;
@@ -214,6 +207,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
    private Combo                _cboSportComputer;
    private Spinner              _spinnerWeight;
    private Spinner              _spinnerHeight;
+   private Spinner              _spinnerHeightInches;         // If needed for imperial units
    private Spinner              _spinnerRestingHR;
    private Spinner              _spinnerMaxHR;
    private Button               _rdoGenderMale;
@@ -290,8 +284,8 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
 
       if (data instanceof Boolean) {
 
-         final Boolean isCreatePerson = (Boolean) data;
-         if (isCreatePerson && _people.size() == 0) {
+         final boolean isCreatePerson = (Boolean) data;
+         if (isCreatePerson && _people.isEmpty()) {
 
             // this is a request, to create a new person
 
@@ -359,7 +353,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       }
    }
 
-   private Set<TourPersonHRZone> cloneHrZones(final ArrayList<TourPersonHRZone> hrZones) {
+   private Set<TourPersonHRZone> cloneHrZones(final List<TourPersonHRZone> hrZones) {
 
       final HashSet<TourPersonHRZone> hrZonesClone = new HashSet<>();
 
@@ -858,13 +852,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
             @Override
             public void widgetSelected(final SelectionEvent e) {
 
-               if (_isLinux && e.widget.getData(FIX_LINUX_ASYNC_EVENT_1) != null) {
-                  e.widget.setData(FIX_LINUX_ASYNC_EVENT_1, null);
-                  return;
-               }
-
-               if (_isLinux && e.widget.getData(FIX_LINUX_ASYNC_EVENT_2) != null) {
-                  e.widget.setData(FIX_LINUX_ASYNC_EVENT_2, null);
+               if (UI.isLinuxAsyncEvent(e.widget)) {
                   return;
                }
 
@@ -945,13 +933,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
          _spinnerWeight.setMinimum(0);
          _spinnerWeight.setMaximum(6614); // 300.0 kg, 661.4 lbs
          _spinnerWeight.addSelectionListener(_defaultSelectionListener);
-         _spinnerWeight.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseScrolled(final MouseEvent event) {
-               UI.adjustSpinnerValueOnMouseScroll(event);
-               onModifyPerson();
-            }
-         });
+         _spinnerWeight.addMouseWheelListener(_defaultMouseWheelListener);
 
          // label: unit
          label = new Label(containerWeight, SWT.NONE);
@@ -971,31 +953,51 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       label.setText(Messages.Pref_People_Label_height);
 
       final Composite containerHeight = new Composite(parent, SWT.NONE);
-      GridDataFactory.fillDefaults()//
+
+      GridDataFactory.fillDefaults() //
             .applyTo(containerHeight);
-      GridLayoutFactory.fillDefaults().numColumns(2).applyTo(containerHeight);
+      GridLayoutFactory.fillDefaults().numColumns(4).applyTo(containerHeight);
+
       {
          // spinner: height
          _spinnerHeight = new Spinner(containerHeight, SWT.BORDER);
          GridDataFactory.fillDefaults()//
                .align(SWT.BEGINNING, SWT.FILL)
-//					.hint(_spinnerWidth, SWT.DEFAULT)
                .applyTo(_spinnerHeight);
-         _spinnerHeight.setDigits(2);
-         _spinnerHeight.setMinimum(0);
-         _spinnerHeight.setMaximum(300); // 3.00 m
          _spinnerHeight.addSelectionListener(_defaultSelectionListener);
-         _spinnerHeight.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseScrolled(final MouseEvent event) {
-               UI.adjustSpinnerValueOnMouseScroll(event);
-               onModifyPerson();
-            }
-         });
+         _spinnerHeight.addMouseWheelListener(_defaultMouseWheelListener);
 
          // label: unit
          label = new Label(containerHeight, SWT.NONE);
-         label.setText(UI.UNIT_METER);
+
+         _spinnerHeightInches = new Spinner(containerHeight, SWT.BORDER);
+
+         if (UI.UNIT_IS_METRIC) { // Metric units
+            _spinnerHeight.setDigits(2);
+            _spinnerHeight.setMinimum(0);
+            _spinnerHeight.setMaximum(300); // 3.00 m
+
+            _spinnerHeightInches.setVisible(false);
+
+            label.setText(UI.UNIT_METER);
+         } else { // Imperial units
+            _spinnerHeight.setDigits(0);
+            _spinnerHeight.setMinimum(0);
+            _spinnerHeight.setMaximum(10);
+
+            label.setText(UI.UNIT_HEIGHT_FT);
+
+            _spinnerHeightInches.addSelectionListener(_defaultSelectionListener);
+            _spinnerHeightInches.addMouseWheelListener(_defaultMouseWheelListener);
+
+            _spinnerHeightInches.setDigits(0);
+            _spinnerHeightInches.setMinimum(0);
+            _spinnerHeightInches.setMaximum(11);
+            _spinnerHeightInches.setVisible(true);
+
+            label = new Label(containerHeight, SWT.NONE);
+            label.setText(UI.UNIT_HEIGHT_IN);
+         }
       }
 
       // filler
@@ -1055,13 +1057,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
          _spinnerRestingHR.setMinimum(10);
          _spinnerRestingHR.setMaximum(200);
          _spinnerRestingHR.addSelectionListener(_defaultSelectionListener);
-         _spinnerRestingHR.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseScrolled(final MouseEvent event) {
-               UI.adjustSpinnerValueOnMouseScroll(event);
-               onModifyPerson();
-            }
-         });
+         _spinnerRestingHR.addMouseWheelListener(_defaultMouseWheelListener);
 
          // label: unit
          label = new Label(container, SWT.NONE);
@@ -1215,7 +1211,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       final Point comboSize = label.computeSize(SWT.DEFAULT, SWT.DEFAULT);
       label.dispose();
 
-      final int comboWidth = (int) (_isOSX || _isLinux ? comboSize.x * 1.3 : comboSize.x);
+      final int comboWidth = (int) (UI.IS_OSX || UI.IS_LINUX ? comboSize.x * 1.3 : comboSize.x);
 
       final Composite container = new Composite(parent, SWT.NONE);
       GridDataFactory.fillDefaults()//
@@ -1310,9 +1306,9 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       innerContainer.addMouseListener(_hrZoneMouseListener);
 //		innerContainer.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_RED));
       {
-         final ArrayList<TourPersonHRZone> hrZones = getCurrentPerson().getHrZonesSorted();
+         final List<TourPersonHRZone> hrZones = getCurrentPerson().getHrZonesSorted();
 
-         if (hrZones.size() == 0) {
+         if (hrZones.isEmpty()) {
             // hr zones are not available, show info
             createUI_81_HrZone_Info(innerContainer);
          } else {
@@ -1675,12 +1671,27 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
        */
       tvc = new TableViewerColumn(_peopleViewer, SWT.TRAIL);
       tc = tvc.getColumn();
-      tc.setText(Messages.Pref_People_Column_height);
+
+      if (UI.UNIT_IS_METRIC) {
+         tc.setText(Messages.Pref_People_Column_height);
+      } else {
+         tc.setText(UI.UNIT_HEIGHT_FT + UI.DASH + UI.UNIT_HEIGHT_IN);
+      }
+
       tvc.setLabelProvider(new CellLabelProvider() {
          @Override
          public void update(final ViewerCell cell) {
-            final float height = ((TourPerson) cell.getElement()).getHeight();
-            cell.setText(_nf2.format(height));
+
+            if (UI.UNIT_IS_METRIC) {
+               final float height = ((TourPerson) cell.getElement()).getHeight();
+               cell.setText(_nf2.format(height));
+            } else {
+               final float bodyHeight = UI.convertBodyHeightFromMetric(((TourPerson) cell.getElement()).getHeight());
+
+               final String heightString = UI.EMPTY_STRING + (int) Math.floor(bodyHeight / 12) + "'" + (int) bodyHeight % 12 + "\""; //$NON-NLS-1$ //$NON-NLS-2$
+
+               cell.setText(heightString);
+            }
          }
       });
       tableLayout.setColumnData(tc, new ColumnPixelData(convertHorizontalDLUsToPixels(6 * 4), true));
@@ -1743,7 +1754,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       final TourPerson currentPerson = getCurrentPerson();
 
       if (currentPerson != null) {
-         isHrZoneAvailable = currentPerson.getHrZonesSorted().size() > 0;
+         isHrZoneAvailable = !currentPerson.getHrZonesSorted().isEmpty();
       }
 
       _btnAddPerson.setEnabled(!_isPersonModified && isValid);
@@ -1786,9 +1797,9 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
    }
 
    /**
-    * @return Returns person which is currently displayed, one person is at least available therefor
-    *         this should never return <code>null</code> but it can be <code>null</code> when the
-    *         application is started the first time and people are not yet created.
+    * @return Returns person which is currently displayed, one person is at least available
+    *         therefore this should never return <code>null</code> but it can be <code>null</code>
+    *         when the application is started the first time and people are not yet created.
     */
    private TourPerson getCurrentPerson() {
 
@@ -1824,7 +1835,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
    private void initializeTrainingStressModels() {
 
       _trainingStressModels = new PrefPageTrainingStressModel[1];
-      //_prefPageBikeScore = new PrefPageBikeScore();
+      //TODO FB_prefPageBikeScore = new PrefPageBikeScore();
       _prefPageGovss = new PrefPageGovss();
       _prefPageGovss.setPersonModifiedListener(new IPersonModifiedListener() {
 
@@ -1846,6 +1857,14 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       _defaultSelectionListener = new SelectionAdapter() {
          @Override
          public void widgetSelected(final SelectionEvent e) {
+            onModifyPerson();
+         }
+      };
+
+      _defaultMouseWheelListener = new MouseWheelListener() {
+         @Override
+         public void mouseScrolled(final MouseEvent event) {
+            UI.adjustSpinnerValueOnMouseScroll(event);
             onModifyPerson();
          }
       };
@@ -1879,7 +1898,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
     */
    private boolean isPersonValid() {
 
-      if (_txtFirstName.getText().trim().equals(UI.EMPTY_STRING)) {
+      if (StringUtils.isNullOrEmpty(_txtFirstName.getText())) {
 
          setErrorMessage(Messages.Pref_People_Error_first_name_is_required);
 
@@ -1892,7 +1911,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
 
          final String transferPath = _rawDataPathEditor.getStringValue().trim();
 
-         if (!transferPath.equals(UI.EMPTY_STRING) && Util.isDirectory(transferPath) == false) {
+         if (!StringUtils.isNullOrEmpty(transferPath) && Util.isDirectory(transferPath) == false) {
 
             setErrorMessage(Messages.Pref_People_Error_path_is_invalid);
 
@@ -1972,12 +1991,12 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       }
 
       final TourPerson person = getCurrentPerson();
-      final ArrayList<TourPersonHRZone> hrZones = person.getHrZonesSorted();
+      final List<TourPersonHRZone> hrZones = person.getHrZonesSorted();
 
       // check if hr zones are already available
 //		if (hrZones != null && hrZones.size() > 0) {
 //
-//			// hr zones are availabe
+//			// hr zones are available
 //			if (MessageDialog.openQuestion(
 //					getShell(),
 //					Messages.Pref_People_Dialog_ReplaceHrZones_Title,
@@ -2162,7 +2181,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
             }
          }
       }
-      if (personSelection == null && _people.size() > 0) {
+      if (personSelection == null && !_people.isEmpty()) {
 
          /*
           * previous person could not be reselected, select first person, a person MUST always be
@@ -2289,7 +2308,8 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
       final float bodyWeight = UI.convertBodyWeightToMetric(_spinnerWeight.getSelection());
       person.setWeight(bodyWeight / 10.0f);
 
-      person.setHeight(_spinnerHeight.getSelection() / 100.0f);
+      final float bodyHeight = UI.convertBodyHeightToMetric(_spinnerHeight.getSelection(), _spinnerHeightInches.getSelection());
+      person.setHeight(bodyHeight / 100.0f);
 
       person.setGender(_rdoGenderMale.getSelection() ? 0 : 1);
       person.setRestPulse(_spinnerRestingHR.getSelection());
@@ -2370,14 +2390,22 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
 
          _txtFirstName.setText(person.getFirstName());
          _txtLastName.setText(person.getLastName());
-         _dtBirthday.setData(FIX_LINUX_ASYNC_EVENT_1, true);
-         _dtBirthday.setData(FIX_LINUX_ASYNC_EVENT_2, true);
+         _dtBirthday.setData(UI.FIX_LINUX_ASYNC_EVENT_1, true);
+         _dtBirthday.setData(UI.FIX_LINUX_ASYNC_EVENT_2, true);
          _dtBirthday.setDate(dtBirthday.getYear(), dtBirthday.getMonthValue() - 1, dtBirthday.getDayOfMonth());
 
          final float bodyWeight = UI.convertBodyWeightFromMetric(person.getWeight());
          _spinnerWeight.setSelection((int) (bodyWeight * 10));
 
-         _spinnerHeight.setSelection((int) (person.getHeight() * 100));
+         final float bodyHeight = UI.convertBodyHeightFromMetric(person.getHeight());
+
+         if (UI.UNIT_IS_METRIC) {
+            _spinnerHeight.setSelection(Math.round(bodyHeight * 100));
+         } else {
+            _spinnerHeight.setSelection((int) Math.floor(bodyHeight / 12));
+            _spinnerHeightInches.setSelection((int) bodyHeight % 12);
+         }
+
          _rawDataPathEditor.setStringValue(person.getRawDataPath());
          _rdoGenderMale.setSelection(gender == 0);
          _rdoGenderFemale.setSelection(gender != 0);
@@ -2394,7 +2422,7 @@ public class PrefPagePeople extends PreferencePage implements IWorkbenchPreferen
          final int index = _comboTrainingStressModel.getSelectionIndex();
          if (index >= 0 && index < _trainingStressModels.length) {
             _trainingStressModels[index].restoreState();
-            //TODO problem here : When the users restores the data, how can we detect again when the model page has changed?
+            //TODO FB problem here : When the users restores the data, how can we detect again when the model page has changed?
             //We need to be sent an event somehow. To be continued
          }
       }

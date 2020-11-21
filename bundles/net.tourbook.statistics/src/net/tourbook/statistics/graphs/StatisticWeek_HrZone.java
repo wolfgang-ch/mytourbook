@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2005, 2019 Wolfgang Schramm and Contributors
+ * Copyright (C) 2005, 2021 Wolfgang Schramm and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -15,8 +15,8 @@
  *******************************************************************************/
 package net.tourbook.statistics.graphs;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import net.tourbook.chart.Chart;
 import net.tourbook.chart.ChartDataModel;
@@ -48,30 +48,31 @@ import org.eclipse.ui.IViewSite;
 
 public class StatisticWeek_HrZone extends TourbookStatistic {
 
-   private static final String      STATE_HR_ZONE_WEEK_BAR_ORDERING_START = "STATE_HR_ZONE_WEEK_BAR_ORDERING_START"; //$NON-NLS-1$
+   private static final String           STATE_HR_ZONE_WEEK_BAR_ORDERING_START = "STATE_HR_ZONE_WEEK_BAR_ORDERING_START"; //$NON-NLS-1$
 
-   private TourPerson               _appPerson;
-   private TourTypeFilter           _appTourTypeFilter;
-   private int                      _statYoungestYear;
-   private int                      _statNumberOfYears;
+   private TourStatisticData_WeekHrZones _tourWeekData;
+   private DataProvider_HrZone_Week      _tourWeek_DataProvider                = new DataProvider_HrZone_Week();
 
-   private Chart                    _chart;
+   private TourPerson                    _appPerson;
+   private TourTypeFilter                _appTourTypeFilter;
+   private int                           _statYoungestYear;
+   private int                           _statNumberOfYears;
 
-   private IChartInfoProvider       _tooltipProvider;
+   private Chart                         _chart;
 
-   private final MinMaxKeeper_YData _minMaxKeeper                         = new MinMaxKeeper_YData();
-   private boolean                  _isSynchScaleEnabled;
+   private IChartInfoProvider            _tooltipProvider;
 
-   private TourData_WeekHrZones     _tourWeekData;
+   private final MinMaxKeeper_YData      _minMaxKeeper                         = new MinMaxKeeper_YData();
+   private boolean                       _isSynchScaleEnabled;
 
-   private int                      _barOrderStart;
+   private int                           _barOrderStart;
 
-   private TourPersonHRZone[]       _personHrZones;
-   private TourPersonHRZone[]       _resortedPersonHrZones;
+   private TourPersonHRZone[]            _personHrZones;
+   private TourPersonHRZone[]            _resortedPersonHrZones;
 
-   private int[][]                  _resortedHrZoneValues;
+   private int[][]                       _resortedHrZoneValues;
 
-   private String[]                 _barNames;
+   private String[]                      _barNames;
 
    public StatisticWeek_HrZone() {
       super();
@@ -82,8 +83,8 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
     */
    ChartStatisticSegments createChartSegments() {
 
-      final double segmentStart[] = new double[_statNumberOfYears];
-      final double segmentEnd[] = new double[_statNumberOfYears];
+      final double[] segmentStart = new double[_statNumberOfYears];
+      final double[] segmentEnd = new double[_statNumberOfYears];
       final String[] segmentTitle = new String[_statNumberOfYears];
 
       final int oldestYear = _statYoungestYear - _statNumberOfYears + 1;
@@ -128,7 +129,7 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
    private double[] createWeekData() {
 
       final int weekCounter = _resortedHrZoneValues[0].length;
-      final double allWeeks[] = new double[weekCounter];
+      final double[] allWeeks = new double[weekCounter];
 
       for (int weekIndex = 0; weekIndex < weekCounter; weekIndex++) {
          allWeeks[weekIndex] = weekIndex;
@@ -223,6 +224,11 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
    }
 
    @Override
+   public String getRawStatisticValues(final boolean isShowSequenceNumbers) {
+      return _tourWeek_DataProvider.getRawStatisticValues(isShowSequenceNumbers);
+   }
+
+   @Override
    public void preferencesHasChanged() {
       updateStatistic();
    }
@@ -299,7 +305,7 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
 
       _barOrderStart = selectedIndex;
 
-      final ArrayList<TourPersonHRZone> personHrZones = _appPerson.getHrZonesSorted();
+      final List<TourPersonHRZone> personHrZones = _appPerson.getHrZonesSorted();
       final int[][] weekHrZoneValues = _tourWeekData.hrZoneValues;
 
       /*
@@ -332,7 +338,7 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
 
    private void setupBars_10_HrZoneOrder(final boolean isNewPerson) {
 
-      final ArrayList<TourPersonHRZone> originalPersonHrZones = _appPerson.getHrZonesSorted();
+      final List<TourPersonHRZone> originalPersonHrZones = _appPerson.getHrZonesSorted();
       final int[][] weekHrZoneValues = _tourWeekData.hrZoneValues;
 
       /*
@@ -367,7 +373,7 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
     */
    private void setupBars_20_BarNames(final StatisticContext statContext) {
 
-      final ArrayList<TourPersonHRZone> personHrZones = _appPerson.getHrZonesSorted();
+      final List<TourPersonHRZone> personHrZones = _appPerson.getHrZonesSorted();
       final int maxSerieSize = Math.min(personHrZones.size(), _tourWeekData.hrZoneValues.length);
 
       if (personHrZones == null || maxSerieSize == 0) {
@@ -418,7 +424,7 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
          return;
       }
 
-      if (statContext.appPerson.getHrZonesSorted().size() == 0) {
+      if (statContext.appPerson.getHrZonesSorted().isEmpty()) {
          _chart.setErrorMessage(NLS.bind(
                Messages.Statistic_HrZone_Error_NoHrZoneInPerson,
                statContext.appPerson.getName()));
@@ -432,16 +438,15 @@ public class StatisticWeek_HrZone extends TourbookStatistic {
 
       _appPerson = statContext.appPerson;
       _appTourTypeFilter = statContext.appTourTypeFilter;
-      _statYoungestYear = statContext.statFirstYear;
+      _statYoungestYear = statContext.statSelectedYear;
       _statNumberOfYears = statContext.statNumberOfYears;
 
-      _tourWeekData = DataProvider_HrZone_Week.getInstance()
-            .getWeekData(
-                  _appPerson,
-                  _appTourTypeFilter,
-                  _statYoungestYear,
-                  _statNumberOfYears,
-                  isDataDirtyWithReset() || statContext.isRefreshData);
+      _tourWeekData = _tourWeek_DataProvider.getWeekData(
+            _appPerson,
+            _appTourTypeFilter,
+            _statYoungestYear,
+            _statNumberOfYears,
+            isDataDirtyWithReset() || statContext.isRefreshData);
 
       setupBars_10_HrZoneOrder(isNewPerson);
       setupBars_20_BarNames(statContext);

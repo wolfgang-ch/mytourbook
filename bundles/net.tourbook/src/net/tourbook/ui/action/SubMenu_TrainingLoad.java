@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2019 Frédéric Bard and Contributors
+ * Copyright (C) 2021 Frédéric Bard and Contributors
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
@@ -31,7 +31,7 @@ import org.eclipse.swt.widgets.MenuItem;
  */
 public class SubMenu_TrainingLoad extends Action implements IMenuCreator {
 
-   private Menu                           _menu;
+   private Menu               _menu;
 
    private ActionComputeGovss _action_ComputeGovss;
 
